@@ -7,7 +7,7 @@ import {
 describe("extractNumbers", () => {
   it("extracts integers and decimals", () => {
     const nums = extractNumbers("There are 123 items at $45.67 each");
-    expect(nums).toEqual(new Set(["123", "45", "67"]));
+    expect(nums).toEqual(new Set(["123", "45.67"]));
   });
 
   it("returns empty set for no numbers", () => {
@@ -100,17 +100,16 @@ describe("comparePdfOutputs", () => {
   });
 
   it("returns acceptable verdict at threshold", () => {
-    // lenRatio >= 0.5 and numberPreservation >= 0.7 but below good thresholds
-    const muMd = "1234567890"; // len 10
-    const rustMd = "12345";    // len 5, ratio 0.5
-    // numbers: mu has {1234567890}, rust has {12345} — no overlap → ratio 0
-    // This won't hit acceptable due to number ratio. Let's construct better:
-    const muMd2 = "aaaaabbbbb 1 2 3 4 5 6 7 8 9 10";
-    const rustMd2 = "aaaa 1 2 3 4 5 6 7";
-    const result = comparePdfOutputs(rustMd2, muMd2);
-    // rustLen=15, muLen=32, lenRatio≈0.469 — just under 0.5
-    // Let's be more precise:
-    expect(result.overall.lenRatio).toBeGreaterThanOrEqual(0);
+    // Target: lenRatio in [0.5, 0.8), numberPreservation in [0.7, 0.9)
+    // MU: 20 chars, 10 numbers. Rust: 10 chars (ratio 0.5), 8 of 10 numbers (ratio 0.8)
+    const muMd = "aaaaaaaaaa 1 2 3 4 5 6 7 8 9 10";
+    const rustMd = "aaaaa 1 2 3 4 5 6 7 8";
+    const result = comparePdfOutputs(rustMd, muMd);
+    expect(result.overall.lenRatio).toBeGreaterThanOrEqual(0.5);
+    expect(result.overall.lenRatio).toBeLessThan(0.8);
+    expect(result.overall.numberPreservationRatio).toBeGreaterThanOrEqual(0.7);
+    expect(result.overall.numberPreservationRatio).toBeLessThan(0.9);
+    expect(result.overall.overallMatch).toBe("acceptable");
   });
 
   it("returns good when lenRatio >= 0.8 and numberPreservation >= 0.9", () => {
