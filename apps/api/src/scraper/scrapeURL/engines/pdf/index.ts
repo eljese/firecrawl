@@ -142,6 +142,10 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
     let effectivePageCount: number = 0;
     let metadataTitle: string | undefined;
     let rustMarkdownForShadow: string | undefined;
+    let shadowPdfType: string | undefined;
+    let shadowConfidence: number | undefined;
+    let shadowIsComplex: boolean | undefined;
+    let shadowIneligibleReason: string | null | undefined;
 
     const rustEnabled = !!config.PDF_RUST_EXTRACT_ENABLE;
     const logger = meta.logger.child({ method: "scrapePDF/processPdf" });
@@ -230,6 +234,12 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
           pdfResult.pdfType !== "ImageBased";
 
         rustMarkdownForShadow = shadowEligible ? pdfResult.markdown : undefined;
+        if (shadowEligible) {
+          shadowPdfType = pdfResult.pdfType;
+          shadowConfidence = pdfResult.confidence;
+          shadowIsComplex = pdfResult.isComplex;
+          shadowIneligibleReason = ineligibleReason;
+        }
 
         // In fast mode, if the PDF requires OCR, fail immediately with a
         // clear error instead of returning empty content.
@@ -333,10 +343,10 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
                   scrapeId: meta.id,
                   url: isZdr ? undefined : (meta.rewrittenUrl ?? meta.url),
                   pageCount: effectivePageCount,
-                  pdfType: pdfResult.pdfType,
-                  confidence: pdfResult.confidence,
-                  isComplex: pdfResult.isComplex,
-                  ineligibleReason,
+                  pdfType: shadowPdfType,
+                  confidence: shadowConfidence,
+                  isComplex: shadowIsComplex,
+                  ineligibleReason: shadowIneligibleReason,
                   ...metrics.overall,
                 });
               } catch (error) {
