@@ -50,19 +50,3 @@ export function includesFormat(
     typeof f === "string" ? f === type : f.type === type,
   );
 }
-
-/**
- * Returns true when a request needs markdown content to satisfy the requested formats.
- * This is used both for transformer execution and engine quality/fallback decisions.
- */
-export function needsMarkdownContent(
-  formats: FormatObject[] | undefined,
-): boolean {
-  return !!(
-    hasFormatOfType(formats, "markdown") ||
-    hasFormatOfType(formats, "changeTracking") ||
-    hasFormatOfType(formats, "json") ||
-    hasFormatOfType(formats, "summary") ||
-    hasFormatOfType(formats, "query")
-  );
-}
