@@ -60,7 +60,7 @@ export async function calculateCreditsToBeBilled(
   }
 
   if (hasFormatOfType(options.formats, "query")) {
-    creditsToBeBilled = Math.max(creditsToBeBilled, 5);
+    creditsToBeBilled = 5;
   }
 
   if (

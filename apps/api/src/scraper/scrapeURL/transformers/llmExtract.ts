@@ -244,8 +244,6 @@ export function calculateCost(
       output_cost: 2.19,
     },
     "google/gemini-2.5-flash-lite": { input_cost: 0.1, output_cost: 0.4 },
-    // Query feature models
-    "gemini-3.1-flash-lite-preview": { input_cost: 0.0, output_cost: 0.0 },
   };
   let modelCost = modelCosts[model] || { input_cost: 0, output_cost: 0 };
   //gemini-2.5-pro-exp-03-25 pricing
