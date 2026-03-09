@@ -35,7 +35,7 @@ export async function billTeam(
       const autumnReserved = await autumnService.reserveCredits({
         teamId: team_id,
         value: credits,
-        properties: { source: "billTeam" },
+        properties: { source: "billTeam", apiKeyId: api_key_id },
       });
       return queueBillingOperation(
         team_id,

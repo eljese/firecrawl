@@ -201,32 +201,36 @@ class AutumnService {
   }: EnsureTeamProvisionedParams): Promise<void> {
     if (this.isPreviewTeam(teamId)) return;
 
-    const resolvedOrgId = orgId ?? await this.lookupOrgIdForTeam(teamId);
-    this.customerOrgCache.set(teamId, resolvedOrgId);
-    await this.ensureOrgProvisioned({ orgId: resolvedOrgId });
+    try {
+      const resolvedOrgId = orgId ?? await this.lookupOrgIdForTeam(teamId);
+      this.customerOrgCache.set(teamId, resolvedOrgId);
+      await this.ensureOrgProvisioned({ orgId: resolvedOrgId });
 
-    if (this.ensuredTeams.has(teamId)) return;
-    const entity = await this.getEntity({
-      customerId: resolvedOrgId,
-      entityId: teamId,
-    });
-
-    if (!entity) {
-      await this.createEntity({
-        customerId: resolvedOrgId,
-        entityId: teamId,
-        featureId: CREDITS_FEATURE_ID,
-        name,
-      });
-      const createdEntity = await this.getEntity({
+      if (this.ensuredTeams.has(teamId)) return;
+      const entity = await this.getEntity({
         customerId: resolvedOrgId,
         entityId: teamId,
       });
-      if (!createdEntity) {
-        return;
+
+      if (!entity) {
+        await this.createEntity({
+          customerId: resolvedOrgId,
+          entityId: teamId,
+          featureId: CREDITS_FEATURE_ID,
+          name,
+        });
+        const createdEntity = await this.getEntity({
+          customerId: resolvedOrgId,
+          entityId: teamId,
+        });
+        if (!createdEntity) {
+          return;
+        }
       }
+      this.ensuredTeams.add(teamId);
+    } catch (error) {
+      logger.warn("Autumn ensureTeamProvisioned failed", { teamId, error });
     }
-    this.ensuredTeams.add(teamId);
   }
 
   /**
