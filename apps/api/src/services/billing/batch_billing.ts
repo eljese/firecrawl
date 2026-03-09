@@ -391,7 +391,11 @@ async function supaBillTeam(
     return { success: false, error };
   }
 
-  await getRedisConnection().sadd("billed_teams", team_id);
+  // Fire-and-forget — a Redis failure here must not trigger a false Autumn refund
+  // after bill_team_6 has already committed.
+  getRedisConnection().sadd("billed_teams", team_id).catch(err => {
+    _logger.warn("Failed to add team to billed_teams set", { err, team_id });
+  });
 
   // Update cached ACUC to reflect the new credit usage
   (async () => {
