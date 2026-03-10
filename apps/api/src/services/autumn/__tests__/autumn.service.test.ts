@@ -419,6 +419,11 @@ describe("_backfillUsageIfNeeded (via reserveCredits)", () => {
       svc.reserveCredits({ teamId: "team-1", value: 1 }),
     ]);
 
+    // Guard: verify backfill actually ran so the concurrency assertion below is
+    // not trivially satisfied by _backfillUsageIfNeeded never executing.
+    // Two runs × 2 modes (scrape + extract) = 4 total getACUCTeam calls.
+    expect(mockGetACUCTeam.mock.calls.length).toBeGreaterThanOrEqual(2);
+
     // Each backfill run calls getACUCTeam for 2 modes concurrently (scrape +
     // extract). With serialisation, at most one run executes at a time, so the
     // peak concurrent call count is 2 (1 run × 2 modes). Without serialisation
