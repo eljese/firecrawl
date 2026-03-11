@@ -275,6 +275,7 @@ class Document(BaseModel):
     images: Optional[List[str]] = None
     screenshot: Optional[str] = None
     actions: Optional[Dict[str, Any]] = None
+    answer: Optional[str] = None
     warning: Optional[str] = None
     change_tracking: Optional[Dict[str, Any]] = None
     branding: Optional[BrandingProfile] = None
@@ -442,6 +443,13 @@ class AttributesFormat(Format):
     selectors: List[AttributeSelector]
 
 
+class QueryFormat(BaseModel):
+    """Configuration for query format - ask a question about the page content."""
+
+    type: Literal["query"] = "query"
+    prompt: str
+
+
 FormatOption = Union[
     Dict[str, Any],
     FormatString,
@@ -449,6 +457,7 @@ FormatOption = Union[
     ChangeTrackingFormat,
     ScreenshotFormat,
     AttributesFormat,
+    QueryFormat,
     Format,
 ]
 

@@ -565,6 +565,8 @@ def prepare_scrape_options(options: Optional[ScrapeOptions]) -> Optional[Dict[st
                             elif hasattr(fmt, 'type'):
                                 if fmt.type == 'json':
                                     converted_formats.append(_validate_json_format(fmt.model_dump()))
+                                elif fmt.type == 'query':
+                                    converted_formats.append(fmt.model_dump(exclude_none=True))
                                 else:
                                     converted_formats.append(_convert_format_string(fmt.type))
                             else:
@@ -624,6 +626,8 @@ def prepare_scrape_options(options: Optional[ScrapeOptions]) -> Optional[Dict[st
                                 if vp is not None:
                                     normalized['viewport'] = vp.model_dump(exclude_none=True) if hasattr(vp, 'model_dump') else vp
                                 converted_formats.append(normalized)
+                            elif fmt.type == 'query':
+                                converted_formats.append(fmt.model_dump(exclude_none=True))
                             else:
                                 converted_formats.append(_convert_format_string(fmt.type))
                         else:
