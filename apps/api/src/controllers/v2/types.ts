@@ -403,9 +403,10 @@ type AttributesFormatWithOptions = z.output<typeof attributesFormatWithOptions>;
 const queryFormatWithOptions = z.strictObject({
   type: z.literal("query"),
   prompt: z.string().max(10000),
+  citations: z.boolean().optional(),
 });
 
-export type QueryFormatWithOptions = z.output<typeof queryFormatWithOptions>;
+type QueryFormatWithOptions = z.output<typeof queryFormatWithOptions>;
 
 export type FormatObject =
   | { type: "markdown" }
@@ -1001,6 +1002,11 @@ export type Document = {
   json?: any;
   summary?: string;
   answer?: string;
+  citations?: {
+    quote: string;
+    startIndex: number;
+    endIndex: number;
+  }[];
   branding?: BrandingProfile;
   warning?: string;
   attributes?: {

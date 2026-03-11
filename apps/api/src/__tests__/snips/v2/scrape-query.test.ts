@@ -43,7 +43,10 @@ describe("Query format", () => {
       const response = await scrape(
         {
           url: "https://firecrawl.dev",
-          formats: ["markdown", { type: "query", prompt: "What is Firecrawl?" }],
+          formats: [
+            "markdown",
+            { type: "query", prompt: "What is Firecrawl?" },
+          ],
         },
         identity,
       );
@@ -69,6 +72,61 @@ describe("Query format", () => {
       );
 
       expect(response.answer).toBeUndefined();
+    },
+    scrapeTimeout,
+  );
+
+  concurrentIf(TEST_PRODUCTION || HAS_AI)(
+    "returns citations with character positions when citations: true",
+    async () => {
+      const response = await scrape(
+        {
+          url: "https://firecrawl.dev",
+          formats: [
+            "markdown",
+            { type: "query", prompt: "What is Firecrawl?", citations: true },
+          ],
+        },
+        identity,
+      );
+
+      expect(response.answer).toBeDefined();
+      expect(response.answer!.length).toBeGreaterThan(0);
+      expect(response.citations).toBeDefined();
+      expect(Array.isArray(response.citations)).toBe(true);
+      expect(response.citations!.length).toBeGreaterThan(0);
+
+      for (const citation of response.citations!) {
+        expect(typeof citation.quote).toBe("string");
+        expect(citation.quote.length).toBeGreaterThan(0);
+        expect(typeof citation.startIndex).toBe("number");
+        expect(typeof citation.endIndex).toBe("number");
+        expect(citation.endIndex).toBeGreaterThan(citation.startIndex);
+
+        // Verify the citation actually exists in the markdown at the stated position
+        const slice = response.markdown!.slice(
+          citation.startIndex,
+          citation.endIndex,
+        );
+        expect(slice).toBe(citation.quote);
+      }
+    },
+    scrapeTimeout,
+  );
+
+  concurrentIf(TEST_PRODUCTION || HAS_AI)(
+    "does not return citations when citations is not set",
+    async () => {
+      const response = await scrape(
+        {
+          url: "https://firecrawl.dev",
+          formats: [{ type: "query", prompt: "What is Firecrawl?" }],
+        },
+        identity,
+      );
+
+      expect(response.answer).toBeDefined();
+      expect(response.citations).toBeUndefined();
     },
     scrapeTimeout,
   );

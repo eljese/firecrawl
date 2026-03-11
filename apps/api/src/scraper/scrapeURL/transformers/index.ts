@@ -433,6 +433,7 @@ function coerceFieldsToFormats(meta: Meta, document: Document): Document {
       "Removed answer from Document because query wasn't in formats -- this is wasteful and indicates a bug.",
     );
     delete document.answer;
+    delete document.citations;
   } else if (hasQueryFormat && document.answer === undefined) {
     meta.logger.warn(
       "Request had format query, but there was no answer field in the result.",
