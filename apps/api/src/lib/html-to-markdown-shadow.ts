@@ -44,6 +44,7 @@ function countStructure(md: string) {
 export async function shadowSimdConversion(
   html: string,
   goResult: string,
+  goDurationMs: number,
   contextLogger: Logger,
   requestId?: string,
 ) {
@@ -77,7 +78,9 @@ export async function shadowSimdConversion(
     contextLogger.info("simd-shadow", {
       module: "html-to-markdown",
       shadow: true,
-      durationMs: Math.round(durationMs * 100) / 100,
+      simdMs: Math.round(durationMs * 100) / 100,
+      goMs: Math.round(goDurationMs * 100) / 100,
+      speedup: goDurationMs > 0 ? Math.round((goDurationMs / durationMs) * 10) / 10 : 0,
       htmlLen: html.length,
       goLen: goResult.length,
       simdLen: simdResult.length,
