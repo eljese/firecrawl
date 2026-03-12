@@ -451,8 +451,8 @@ def _validate_query_format(format_obj: Any) -> Dict[str, Any]:
     if not isinstance(format_obj, dict):
         raise ValueError("query format must be an object with 'type' and 'prompt' fields")
 
-    if not format_obj.get('prompt'):
-        raise ValueError("query format requires a 'prompt' field")
+    if not isinstance(format_obj.get('prompt'), str) or not format_obj['prompt'].strip():
+        raise ValueError("query format requires a non-empty 'prompt' string")
 
     return format_obj
 
