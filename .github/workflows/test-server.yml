@@ -217,12 +217,56 @@ jobs:
 
       - name: Publish test report
         if: always()
-        uses: dorny/test-reporter@v1
-        with:
-          name: Test Report (${{ matrix.engine }}, ${{ matrix.proxy }}, ${{ matrix.search }}, ${{ matrix.ai }})
-          path: apps/api/test-results/junit.xml
-          reporter: jest-junit
-          fail-on-error: true
+        run: |
+          JUNIT="apps/api/test-results/junit.xml"
+          if [ ! -f "$JUNIT" ]; then
+            echo "::warning::No junit.xml found — tests may have crashed before producing a report."
+            echo "## ⚠️ No test report" >> "$GITHUB_STEP_SUMMARY"
+            echo "junit.xml was not generated. Tests likely crashed before completing." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Parse test results from junit.xml
+          TESTS=$(grep -oP 'tests="\K[^"]+' "$JUNIT" | head -1)
+          FAILURES=$(grep -oP 'failures="\K[^"]+' "$JUNIT" | head -1)
+          ERRORS=$(grep -oP 'errors="\K[^"]+' "$JUNIT" | head -1)
+          TIME=$(grep -oP 'time="\K[^"]+' "$JUNIT" | head -1)
+
+          echo "## Test Report (${{ matrix.engine }}, ${{ matrix.proxy }}, ${{ matrix.search }}, ${{ matrix.ai }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tests | Failures | Errors | Time |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|----------|--------|------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ${TESTS:-0} | ${FAILURES:-0} | ${ERRORS:-0} | ${TIME:-?}s |" >> "$GITHUB_STEP_SUMMARY"
+
+          # List failed tests
+          FAILED_TESTS=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('$JUNIT')
+          failures = []
+          for tc in tree.iter('testcase'):
+              fail = tc.find('failure')
+              if fail is not None:
+                  name = tc.get('name', 'unknown')
+                  suite = tc.get('classname', '')
+                  msg = (fail.get('message') or fail.text or '')[:200]
+                  failures.append((suite, name, msg))
+          if failures:
+              print('\n### Failed tests\n')
+              for suite, name, msg in failures:
+                  print(f'- **{suite}** › {name}')
+                  if msg:
+                      print(f'  > {msg}')
+                  print()
+          " 2>/dev/null || true)
+
+          if [ -n "$FAILED_TESTS" ]; then
+            echo "$FAILED_TESTS" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Fail the step if there were test failures
+          if [ "${FAILURES:-0}" != "0" ] || [ "${ERRORS:-0}" != "0" ]; then
+            echo "::error::${FAILURES:-0} failure(s), ${ERRORS:-0} error(s)"
+            exit 1
+          fi
 
       - name: Copy log files
         if: always()
