@@ -1,0 +1,1 @@
+Please report any security vulnerabilities to [help@firecrawl.com](mailto:help@firecrawl.com). Once the security vulnerability is confirmed by our team, we will create a [GitHub Security Advisory](https://github.com/firecrawl/firecrawl/security/advisories) to implement a fix and notify our users.
