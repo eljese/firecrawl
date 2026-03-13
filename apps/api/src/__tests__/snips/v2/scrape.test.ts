@@ -57,10 +57,15 @@ describe("Scrape tests", () => {
   const playwrightAllowsLocalTargets = stringbool.parse(
     process.env.ALLOW_LOCAL_WEBHOOKS,
   );
-  const createLocaltestMeUrl = () => {
+  const createSelfHostedLocalUrl = () => {
     const target = new URL(TEST_SUITE_WEBSITE);
-    target.hostname = "localtest.me";
     target.searchParams.set("testId", crypto.randomUUID());
+    return target.toString();
+  };
+
+  const createDnsResolvedLocalUrl = () => {
+    const target = new URL(createSelfHostedLocalUrl());
+    target.hostname = "localtest.me";
     return target.toString();
   };
 
@@ -300,7 +305,7 @@ describe("Scrape tests", () => {
     async () => {
       const response = await scrape(
         {
-          url: createLocaltestMeUrl(),
+          url: createSelfHostedLocalUrl(),
           waitFor: 100,
         },
         identity,
@@ -318,7 +323,7 @@ describe("Scrape tests", () => {
     async () => {
       const raw = await scrapeRaw(
         {
-          url: createLocaltestMeUrl(),
+          url: createDnsResolvedLocalUrl(),
           waitFor: 100,
         },
         identity,
