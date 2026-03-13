@@ -30,7 +30,16 @@ export async function scrapeURLWithFetch(
     headers: [string, string][];
   };
 
-  if (meta.mock !== null) {
+  if (meta.fetchPrefetch !== undefined && meta.fetchPrefetch !== null) {
+    response = {
+      url: meta.fetchPrefetch.url ?? meta.rewrittenUrl ?? meta.url,
+      body: meta.fetchPrefetch.body,
+      status: meta.fetchPrefetch.status,
+      headers: meta.fetchPrefetch.contentType
+        ? [["content-type", meta.fetchPrefetch.contentType]]
+        : [],
+    };
+  } else if (meta.mock !== null) {
     const makeRequestTypeId = (
       request: MockState["requests"][number]["options"],
     ) => request.url + ";" + request.method;

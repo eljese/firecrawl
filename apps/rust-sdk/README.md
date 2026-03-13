@@ -41,6 +41,34 @@ match scrape_result {
 }
 ```
 
+### Parsing uploaded files (v2)
+
+Use the v2 client `parse` method to upload local files (`html`, `pdf`, `docx`, etc.) as multipart form data.
+
+```rust
+use firecrawl::v2::{Client, Format, ParseFile, ScrapeOptions};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::new("fc-YOUR-API-KEY")?;
+
+    let file = ParseFile::from_bytes(
+        "upload.html",
+        b"<!DOCTYPE html><html><body><h1>Rust Parse</h1></body></html>".to_vec(),
+    )
+    .with_content_type("text/html");
+
+    let options = ScrapeOptions {
+        formats: Some(vec![Format::Markdown]),
+        ..Default::default()
+    };
+
+    let doc = client.parse(file, Some(options)).await?;
+    println!("{:?}", doc.markdown);
+    Ok(())
+}
+```
+
 ### Scraping with Extract
 
 With Extract, you can easily extract structured data from any URL. You need to specify your schema in the JSON Schema format, using the `serde_json::json!` macro.

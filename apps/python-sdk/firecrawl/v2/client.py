@@ -5,7 +5,7 @@ This module provides the main client class that orchestrates all v2 functionalit
 """
 
 import os
-from typing import Optional, List, Dict, Any, Callable, Union, Literal
+from typing import Optional, List, Dict, Any, Callable, Union, Literal, BinaryIO
 from .types import (
     ClientConfig,
     ScrapeOptions,
@@ -43,6 +43,7 @@ from .types import (
 from .utils.http_client import HttpClient
 from .utils.error_handler import FirecrawlError
 from .methods import scrape as scrape_module
+from .methods import parse as parse_module
 from .methods import crawl as crawl_module  
 from .methods import batch as batch_module
 from .methods import search as search_module
@@ -263,6 +264,35 @@ class FirecrawlClient:
     def delete_scrape_browser(self, job_id: str):
         """Deprecated alias for stop_interaction()."""
         return self.stop_interaction(job_id)
+
+    def parse(
+        self,
+        file: Union[str, bytes, bytearray, BinaryIO],
+        *,
+        filename: Optional[str] = None,
+        content_type: Optional[str] = None,
+        options: Optional[ScrapeOptions] = None,
+    ) -> Document:
+        """
+        Parse an uploaded file using the v2 parse endpoint.
+
+        Args:
+            file: File path, bytes, bytearray, or binary file-like object
+            filename: Optional explicit filename (required for raw bytes without extension)
+            content_type: Optional explicit MIME type
+            options: Scrape-compatible parse options
+
+        Returns:
+            Document
+        """
+        return parse_module.parse(
+            self.http_client,
+            file,
+            options=options,
+            filename=filename,
+            content_type=content_type,
+        )
+
 
     def search(
         self,
