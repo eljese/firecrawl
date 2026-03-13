@@ -27,8 +27,10 @@ import {
 } from "./lib";
 import request from "./lib";
 import crypto from "crypto";
+import { z } from "zod";
 
 const CHANGE_TRACKING_TEST_URL = `${TEST_SUITE_WEBSITE}?testId=${crypto.randomUUID()}`;
+const stringbool = z.stringbool().catch(false);
 
 let identity: Identity;
 
@@ -52,8 +54,9 @@ beforeAll(async () => {
 
 describe("Scrape tests", () => {
   const base = TEST_SUITE_WEBSITE;
-  const playwrightAllowsLocalTargets =
-    (process.env.ALLOW_LOCAL_WEBHOOKS ?? "").toLowerCase() === "true";
+  const playwrightAllowsLocalTargets = stringbool.parse(
+    process.env.ALLOW_LOCAL_WEBHOOKS,
+  );
   const createLocaltestMeUrl = () => {
     const target = new URL(TEST_SUITE_WEBSITE);
     target.hostname = "localtest.me";

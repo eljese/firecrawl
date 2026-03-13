@@ -93,8 +93,7 @@ const assertSafeTargetUrl = async (urlString: string): Promise<void> => {
   let resolvedAddresses: string[];
   try {
     resolvedAddresses = await lookupWithCache(hostname);
-  } catch (error) {
-    console.warn(`DNS lookup failed for ${hostname}:`, error);
+  } catch {
     throw new InsecureConnectionError(
       urlString,
       `DNS lookup failed for "${hostname}", cannot verify target is safe`,
