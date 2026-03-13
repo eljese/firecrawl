@@ -10,6 +10,43 @@ import {
 import { MockState, saveMock } from "../../lib/mock";
 import { TextDecoder } from "util";
 
+function decodeHtmlBuffer(
+  buf: Buffer,
+  contentType?: string,
+): {
+  text: string;
+  charset?: string;
+  charsetSource?: "header" | "meta";
+  decodeError?: unknown;
+} {
+  let text = buf.toString("utf8");
+
+  const headerCharset = (contentType?.match(
+    /charset\s*=\s*["']?([^;"'\s]+)/i,
+  ) ?? [])[1];
+
+  const metaCharset = (text.match(
+    /<meta\b[^>]*charset\s*=\s*["']?([^"'\s\/>]+)/i,
+  ) ?? [])[1];
+
+  const charset = headerCharset?.trim() || metaCharset?.trim();
+  const charsetSource: "header" | "meta" | undefined = headerCharset
+    ? "header"
+    : metaCharset
+      ? "meta"
+      : undefined;
+
+  if (charset) {
+    try {
+      text = new TextDecoder(charset).decode(buf);
+    } catch (decodeError) {
+      return { text, charset, charsetSource, decodeError };
+    }
+  }
+
+  return { text, charset, charsetSource };
+}
+
 export async function scrapeURLWithFetch(
   meta: Meta,
 ): Promise<EngineScrapeResult> {
@@ -31,9 +68,29 @@ export async function scrapeURLWithFetch(
   };
 
   if (meta.fetchPrefetch !== undefined && meta.fetchPrefetch !== null) {
+    const { text, charset, charsetSource, decodeError } = decodeHtmlBuffer(
+      meta.fetchPrefetch.bodyBuffer,
+      meta.fetchPrefetch.contentType,
+    );
+    if (decodeError) {
+      meta.logger.warn(
+        "Failed to re-parse uploaded HTML with detected charset",
+        {
+          charset,
+          charsetSource,
+          error: decodeError,
+        },
+      );
+    } else if (charset) {
+      meta.logger.debug("Decoded uploaded HTML using detected charset", {
+        charset,
+        charsetSource,
+      });
+    }
+
     response = {
       url: meta.fetchPrefetch.url ?? meta.rewrittenUrl ?? meta.url,
-      body: meta.fetchPrefetch.body,
+      body: text,
       status: meta.fetchPrefetch.status,
       headers: meta.fetchPrefetch.contentType
         ? [["content-type", meta.fetchPrefetch.contentType]]
@@ -68,18 +125,24 @@ export async function scrapeURLWithFetch(
       });
 
       const buf = Buffer.from(await x.arrayBuffer());
-      let text = buf.toString("utf8");
-      const charset = (text.match(
-        /<meta\b[^>]*charset\s*=\s*["']?([^"'\s\/>]+)/i,
-      ) ?? [])[1];
-      try {
-        if (charset) {
-          text = new TextDecoder(charset.trim()).decode(buf);
-        }
-      } catch (error) {
-        meta.logger.warn("Failed to re-parse with correct charset", {
+      const contentType = x.headers.get("content-type") ?? undefined;
+      const { text, charset, charsetSource, decodeError } = decodeHtmlBuffer(
+        buf,
+        contentType,
+      );
+      if (decodeError) {
+        meta.logger.warn(
+          "Failed to re-parse fetched HTML with detected charset",
+          {
+            charset,
+            charsetSource,
+            error: decodeError,
+          },
+        );
+      } else if (charset) {
+        meta.logger.debug("Decoded fetched HTML using detected charset", {
           charset,
-          error,
+          charsetSource,
         });
       }
 

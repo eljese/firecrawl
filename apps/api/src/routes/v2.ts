@@ -231,10 +231,10 @@ v2Router.post(
 v2Router.post(
   "/parse",
   authMiddleware(RateLimiterMode.Scrape),
-  parseUploadMiddleware,
-  parseMultipartPayloadMiddleware,
   countryCheck,
   checkCreditsMiddleware(1),
+  parseUploadMiddleware,
+  parseMultipartPayloadMiddleware,
   wrap(parseController),
 );
 

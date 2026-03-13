@@ -172,6 +172,9 @@ class FirecrawlClientTest {
         assertEquals("upload.html", file.getFilename());
         assertEquals("text/html", file.getContentType());
         assertTrue(file.getContent().length > 0);
+        byte[] firstRead = file.getContent();
+        firstRead[0] = 'X';
+        assertNotEquals(firstRead[0], file.getContent()[0]);
     }
 
     @Test
@@ -279,5 +282,6 @@ class FirecrawlClientTest {
         assertNotNull(doc);
         assertNotNull(doc.getMarkdown());
         assertFalse(doc.getMarkdown().isEmpty());
+        assertTrue(doc.getMarkdown().contains("Java SDK Parse E2E"));
     }
 }

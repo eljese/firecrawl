@@ -5,8 +5,8 @@ from firecrawl import AsyncFirecrawl
 from firecrawl.v2.types import Document, ScrapeOptions
 
 load_dotenv()
-API_KEY = os.getenv("API_KEY")
-API_URL = os.getenv("API_URL")
+API_KEY = (os.getenv("API_KEY") or "").strip()
+API_URL = (os.getenv("API_URL") or "").strip()
 
 
 @pytest.mark.skipif(

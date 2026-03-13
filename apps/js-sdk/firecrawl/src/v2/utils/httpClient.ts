@@ -109,12 +109,14 @@ export class HttpClient {
     endpoint: string,
     formData: FormData,
     headers?: Record<string, string>,
+    timeoutMs?: number,
   ) {
     return this.request<T>({
       method: "post",
       url: endpoint,
       data: formData,
       headers,
+      timeout: timeoutMs,
     });
   }
 

@@ -4,9 +4,11 @@ use std::path::Path;
 
 use reqwest::multipart::{Form, Part};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use super::client::Client;
-use super::scrape::ScrapeOptions;
+use super::scrape::ParserConfig;
+use super::types::{Format, ProxyType};
 use super::types::Document;
 use crate::FirecrawlError;
 
@@ -70,14 +72,61 @@ struct ParseResponse {
     warning: Option<String>,
 }
 
+/// Options accepted by the `/v2/parse` endpoint.
+///
+/// This intentionally omits scrape-only fields that `/v2/parse` rejects
+/// (e.g. actions, waitFor, location, and screenshot/branding options).
+#[serde_with::skip_serializing_none]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ParseOptions {
+    /// Output formats to include in the response.
+    pub formats: Option<Vec<Format>>,
+    /// Additional HTTP headers.
+    pub headers: Option<HashMap<String, String>>,
+    /// HTML tags to include.
+    pub include_tags: Option<Vec<String>>,
+    /// HTML tags to exclude.
+    pub exclude_tags: Option<Vec<String>>,
+    /// Extract only the main content.
+    pub only_main_content: Option<bool>,
+    /// Timeout in milliseconds.
+    pub timeout: Option<u32>,
+    /// Parser configurations (e.g. PDF parser).
+    pub parsers: Option<Vec<ParserConfig>>,
+    /// Skip TLS verification.
+    pub skip_tls_verification: Option<bool>,
+    /// Remove base64 images.
+    pub remove_base64_images: Option<bool>,
+    /// Fast mode.
+    pub fast_mode: Option<bool>,
+    /// Block ads.
+    pub block_ads: Option<bool>,
+    /// Proxy type.
+    pub proxy: Option<ProxyType>,
+    /// Maximum cache age in seconds.
+    pub max_age: Option<u32>,
+    /// Minimum cache age in seconds.
+    pub min_age: Option<u32>,
+    /// Store response in cache.
+    pub store_in_cache: Option<bool>,
+    /// Integration identifier.
+    pub integration: Option<String>,
+    /// Request origin identifier.
+    pub origin: Option<String>,
+    /// Zero data retention mode.
+    pub zero_data_retention: Option<bool>,
+}
+
 impl Client {
     /// Parse an uploaded file and return the extracted document.
     pub async fn parse(
         &self,
         file: ParseFile,
-        options: impl Into<Option<ScrapeOptions>>,
+        options: impl Into<Option<ParseOptions>>,
     ) -> Result<Document, FirecrawlError> {
-        if file.filename.trim().is_empty() {
+        let resolved_filename = file.filename.trim().to_string();
+        if resolved_filename.is_empty() {
             return Err(FirecrawlError::Misuse(
                 "filename cannot be empty".to_string(),
             ));
@@ -87,7 +136,7 @@ impl Client {
         let options_json =
             serde_json::to_string(&options).map_err(FirecrawlError::ResponseParseError)?;
 
-        let mut part = Part::bytes(file.bytes).file_name(file.filename);
+        let mut part = Part::bytes(file.bytes).file_name(resolved_filename);
         if let Some(content_type) = file.content_type {
             part = part.mime_str(&content_type).map_err(|e| {
                 FirecrawlError::Misuse(format!("Invalid content type for parse file: {}", e))

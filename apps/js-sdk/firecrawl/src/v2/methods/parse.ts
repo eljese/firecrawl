@@ -59,12 +59,17 @@ export async function parse(
     file.filename.trim(),
   );
 
+  const requestTimeoutMs =
+    typeof normalizedOptions.timeout === "number"
+      ? normalizedOptions.timeout + 5000
+      : undefined;
+
   try {
     const res = await http.postMultipart<{
       success: boolean;
       data?: Document;
       error?: string;
-    }>("/v2/parse", formData);
+    }>("/v2/parse", formData, undefined, requestTimeoutMs);
     if (res.status !== 200 || !res.data?.success) {
       throwForBadResponse(res, "parse");
     }

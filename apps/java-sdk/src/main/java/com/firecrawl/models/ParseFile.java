@@ -18,7 +18,7 @@ public class ParseFile {
     }
 
     public byte[] getContent() {
-        return content;
+        return Arrays.copyOf(content, content.length);
     }
 
     public String getFilename() {

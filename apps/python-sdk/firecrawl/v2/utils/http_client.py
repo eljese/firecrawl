@@ -131,8 +131,11 @@ class HttpClient:
         backoff_factor: Optional[float] = None,
     ) -> requests.Response:
         """Make a multipart/form-data POST request with retry logic."""
-        if headers is None:
-            headers = self._prepare_headers(include_json_content_type=False)
+        multipart_headers = self._prepare_headers(include_json_content_type=False)
+        if headers:
+            multipart_headers.update(headers)
+        multipart_headers.pop("Content-Type", None)
+        multipart_headers.pop("content-type", None)
         if timeout is None:
             timeout = self.timeout
         if retries is None:
@@ -148,7 +151,7 @@ class HttpClient:
             try:
                 response = requests.post(
                     url,
-                    headers=headers,
+                    headers=multipart_headers,
                     data=data,
                     files=files,
                     timeout=timeout,

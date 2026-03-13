@@ -5,6 +5,7 @@ Async v2 client mirroring the regular client surface using true async HTTP trans
 import os
 import asyncio
 import time
+from pathlib import Path
 from typing import Optional, List, Dict, Any, Union, Callable, Literal, BinaryIO
 from .types import (
     ScrapeOptions,
@@ -148,7 +149,7 @@ class AsyncFirecrawlClient:
 
     async def parse(
         self,
-        file: Union[str, bytes, bytearray, BinaryIO],
+        file: Union[str, Path, bytes, bytearray, BinaryIO],
         *,
         filename: Optional[str] = None,
         content_type: Optional[str] = None,

@@ -253,7 +253,7 @@ describe("/v2/parse", () => {
           .eq("target_hint", filename)
           .order("created_at", { ascending: false })
           .limit(1);
-        if (error) return null;
+        if (error) throw error;
         return data?.[0] ?? null;
       });
 
@@ -269,7 +269,7 @@ describe("/v2/parse", () => {
           .eq("request_id", requestLog!.id)
           .order("created_at", { ascending: false })
           .limit(1);
-        if (error) return null;
+        if (error) throw error;
         return data?.[0] ?? null;
       });
 

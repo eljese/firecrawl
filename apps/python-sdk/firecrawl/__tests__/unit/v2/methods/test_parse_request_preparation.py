@@ -48,6 +48,7 @@ class TestParseRequestPreparation:
         assert b"Path Upload" in file_bytes
         assert mime_type == "text/html"
 
-    def test_prepare_parse_request_rejects_missing_path(self):
+    def test_prepare_parse_request_rejects_missing_path(self, tmp_path):
+        missing_file = tmp_path / "missing-upload-file.html"
         with pytest.raises(ValueError, match="File path does not exist"):
-            _prepare_parse_request("/tmp/does-not-exist-upload-file.html")
+            _prepare_parse_request(str(missing_file))

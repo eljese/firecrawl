@@ -265,6 +265,7 @@ export async function logScrape(scrape: LoggedScrape, force: boolean = false) {
   );
 
   if (
+    !scrape.is_parse &&
     scrape.doc &&
     config.GCS_BUCKET_NAME &&
     !(scrape.skipNuq && scrape.zeroDataRetention)

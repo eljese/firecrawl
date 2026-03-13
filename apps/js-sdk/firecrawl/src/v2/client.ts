@@ -187,6 +187,11 @@ export class FirecrawlClient {
    * @param options Optional scrape-compatible parse options (formats, parsers, etc.).
    * @returns Parsed document with requested formats.
    */
+  async parse<Opts extends ParseOptions>(
+    file: ParseFile,
+    options: Opts
+  ): Promise<Omit<Document, "json"> & { json?: InferredJsonFromOptions<Opts> }>;
+  async parse(file: ParseFile, options?: ParseOptions): Promise<Document>;
   async parse(file: ParseFile, options?: ParseOptions): Promise<Document> {
     return parseMethod(this.http, file, options);
   }

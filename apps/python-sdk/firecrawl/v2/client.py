@@ -5,6 +5,7 @@ This module provides the main client class that orchestrates all v2 functionalit
 """
 
 import os
+from pathlib import Path
 from typing import Optional, List, Dict, Any, Callable, Union, Literal, BinaryIO
 from .types import (
     ClientConfig,
@@ -267,7 +268,7 @@ class FirecrawlClient:
 
     def parse(
         self,
-        file: Union[str, bytes, bytearray, BinaryIO],
+        file: Union[str, Path, bytes, bytearray, BinaryIO],
         *,
         filename: Optional[str] = None,
         content_type: Optional[str] = None,
