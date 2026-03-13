@@ -3,33 +3,24 @@ from functools import partial
 import json
 from typing import Optional, Dict, Any, Tuple
 
-from ...types import ScrapeOptions, Document
+from ...types import Document, ParseOptions
 from ...utils.normalize import normalize_document_input
 from ...utils.error_handler import handle_response_error
-from ...utils.validation import prepare_scrape_options, validate_scrape_options
 from ...utils.http_client_async import AsyncHttpClient
-from ...utils.get_version import get_version
-from ..parse import ParseFileInput, _prepare_file_payload
-
-version = get_version()
+from ..parse import (
+    ParseFileInput,
+    _prepare_file_payload,
+    _prepare_parse_options_payload,
+)
 
 async def _prepare_parse_request(
     file: ParseFileInput,
-    options: Optional[ScrapeOptions] = None,
+    options: Optional[ParseOptions] = None,
     *,
     filename: Optional[str] = None,
     content_type: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Tuple[str, bytes, str]]]:
-    request_data: Dict[str, Any] = {}
-
-    if options is not None:
-        validated = validate_scrape_options(options)
-        if validated is not None:
-            opts = prepare_scrape_options(validated)
-            if opts:
-                request_data.update(opts)
-
-    request_data["origin"] = request_data.get("origin") or f"python-sdk@{version}"
+    request_data = _prepare_parse_options_payload(options)
     multipart_fields = {"options": json.dumps(request_data)}
     loop = asyncio.get_running_loop()
     multipart_files = await loop.run_in_executor(
@@ -47,7 +38,7 @@ async def _prepare_parse_request(
 async def parse(
     client: AsyncHttpClient,
     file: ParseFileInput,
-    options: Optional[ScrapeOptions] = None,
+    options: Optional[ParseOptions] = None,
     *,
     filename: Optional[str] = None,
     content_type: Optional[str] = None,

@@ -26,7 +26,7 @@ import logging
 from .v1 import V1FirecrawlApp, AsyncV1FirecrawlApp
 from .v2 import FirecrawlClient as V2FirecrawlClient
 from .v2.client_async import AsyncFirecrawlClient
-from .v2.types import Document, ScrapeOptions
+from .v2.types import Document, ParseOptions, ScrapeOptions
 
 logger = logging.getLogger("firecrawl")
 
@@ -287,7 +287,7 @@ class Firecrawl:
         *,
         filename: Optional[str] = None,
         content_type: Optional[str] = None,
-        options: Optional[ScrapeOptions] = None,
+        options: Optional[ParseOptions] = None,
     ) -> Document:
         """Parse an uploaded file via the v2 parse endpoint."""
         return self._v2_client.parse(
@@ -380,7 +380,7 @@ class AsyncFirecrawl:
         *,
         filename: Optional[str] = None,
         content_type: Optional[str] = None,
-        options: Optional[ScrapeOptions] = None,
+        options: Optional[ParseOptions] = None,
     ) -> Document:
         """Parse an uploaded file via the v2 parse endpoint."""
         return await self._v2_client.parse(

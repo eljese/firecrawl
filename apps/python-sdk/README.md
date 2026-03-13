@@ -52,10 +52,11 @@ print(scrape_result)
 ### Parsing uploaded files
 
 Use `parse` to upload local bytes/files (`html`, `pdf`, `docx`, etc.) as multipart form data and return the parsed document.
+`parse` does not support change tracking or browser-only options (actions, wait_for, location, mobile, screenshot, branding).
 
 ```python
 from firecrawl import Firecrawl
-from firecrawl.v2.types import ScrapeOptions
+from firecrawl.v2.types import ParseOptions
 
 firecrawl = Firecrawl(api_key="fc-YOUR_API_KEY")
 
@@ -63,7 +64,7 @@ doc = firecrawl.parse(
   b"<!DOCTYPE html><html><body><h1>Python Parse</h1></body></html>",
   filename="upload.html",
   content_type="text/html",
-  options=ScrapeOptions(formats=["markdown"]),
+  options=ParseOptions(formats=["markdown"]),
 )
 
 print(doc.markdown)

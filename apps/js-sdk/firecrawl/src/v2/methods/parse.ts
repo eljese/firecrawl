@@ -1,6 +1,6 @@
 import { type Document, type ParseFile, type ParseOptions } from "../types";
 import { HttpClient } from "../utils/httpClient";
-import { ensureValidScrapeOptions } from "../utils/validation";
+import { ensureValidParseOptions } from "../utils/validation";
 import { throwForBadResponse, normalizeAxiosError } from "../utils/errorHandler";
 import { getVersion } from "../utils/getVersion";
 
@@ -40,7 +40,7 @@ export async function parse(
     throw new Error("filename cannot be empty");
   }
 
-  if (options) ensureValidScrapeOptions(options);
+  if (options) ensureValidParseOptions(options);
 
   const version = getVersion();
   const normalizedOptions: ParseOptions = {

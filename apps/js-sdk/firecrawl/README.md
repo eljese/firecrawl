@@ -49,6 +49,7 @@ const scrapedData = await app.scrape(url);
 ### Parsing uploaded files
 
 Use `parse` to upload a file (`html`, `pdf`, `docx`, etc.) as multipart form data and process it through the same parsing pipeline.
+Parse does not support browser-only formats/options like `changeTracking`, `screenshot`, `branding`, `actions`, `waitFor`, `location`, or `mobile`.
 
 ```js
 const parsed = await app.parse(

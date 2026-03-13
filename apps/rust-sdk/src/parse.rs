@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use super::client::Client;
 use super::scrape::ParserConfig;
-use super::types::{AttributeSelector, ChangeTrackingOptions, Document, Format, JsonOptions};
+use super::types::{AttributeSelector, Document, JsonOptions};
 use crate::FirecrawlError;
 
 /// Uploaded file payload for the `/v2/parse` endpoint.
@@ -79,16 +79,30 @@ pub enum ParseProxyType {
     Auto,
 }
 
+/// Output formats accepted by `/v2/parse`.
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ParseFormat {
+    Markdown,
+    Html,
+    RawHtml,
+    Links,
+    Images,
+    Summary,
+    Json,
+    Attributes,
+}
+
 /// Options accepted by the `/v2/parse` endpoint.
 ///
 /// This intentionally omits scrape-only fields that `/v2/parse` rejects
-/// (e.g. actions, waitFor, location, and screenshot/branding options).
+/// (e.g. actions, waitFor, location, and screenshot/branding/changeTracking options).
 #[serde_with::skip_serializing_none]
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ParseOptions {
     /// Output formats to include in the response.
-    pub formats: Option<Vec<Format>>,
+    pub formats: Option<Vec<ParseFormat>>,
     /// Additional HTTP headers.
     pub headers: Option<HashMap<String, String>>,
     /// HTML tags to include.
@@ -113,12 +127,6 @@ pub struct ParseOptions {
     pub block_ads: Option<bool>,
     /// Proxy type.
     pub proxy: Option<ParseProxyType>,
-    /// Maximum cache age in seconds.
-    pub max_age: Option<u32>,
-    /// Minimum cache age in seconds.
-    pub min_age: Option<u32>,
-    /// Store response in cache.
-    pub store_in_cache: Option<bool>,
     /// Integration identifier.
     pub integration: Option<String>,
     /// Request origin identifier.
@@ -127,8 +135,6 @@ pub struct ParseOptions {
     pub zero_data_retention: Option<bool>,
     /// JSON extraction options.
     pub json_options: Option<JsonOptions>,
-    /// Change tracking options.
-    pub change_tracking_options: Option<ChangeTrackingOptions>,
     /// Attribute selectors for extraction.
     pub attribute_selectors: Option<Vec<AttributeSelector>>,
 }

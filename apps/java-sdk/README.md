@@ -150,6 +150,7 @@ System.out.println(doc.getMetadata().get("title"));
 ### Parse Uploaded Files
 
 Upload local files (`html`, `pdf`, `docx`, etc.) via multipart form data and parse them synchronously.
+Parse options intentionally exclude browser-only features like change tracking, screenshot, branding, actions, waitFor, location, and mobile.
 
 ```java
 ParseFile file = ParseFile.builder()
@@ -159,7 +160,7 @@ ParseFile file = ParseFile.builder()
     .build();
 
 Document parsed = client.parse(file,
-    ScrapeOptions.builder()
+    ParseOptions.builder()
         .formats(List.of("markdown"))
         .build());
 

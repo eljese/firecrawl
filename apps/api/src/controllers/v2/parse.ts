@@ -171,6 +171,10 @@ function getUnsupportedParseOptionError(reqBody: ParseRequest): string | null {
     return "Parse uploads do not support branding output.";
   }
 
+  if (hasFormatOfType(reqBody.formats, "changeTracking")) {
+    return "Parse uploads do not support change tracking.";
+  }
+
   return null;
 }
 
@@ -476,6 +480,7 @@ export async function parseController(
                       teamFlags: req.acuc?.flags ?? null,
                       uploadedFile: file,
                       forceEngine,
+                      isParse: true,
                     },
                     skipNuq: true,
                     origin,

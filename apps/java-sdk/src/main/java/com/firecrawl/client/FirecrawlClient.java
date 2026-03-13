@@ -210,11 +210,11 @@ public class FirecrawlClient {
      * Parses an uploaded file with scrape-compatible options.
      *
      * @param file the file payload to parse
-     * @param options parse options (same shape as scrape options)
+     * @param options parse options (parse-compatible subset)
      * @return the parsed document
      */
     @SuppressWarnings("unchecked")
-    public Document parse(ParseFile file, ScrapeOptions options) {
+    public Document parse(ParseFile file, ParseOptions options) {
         Objects.requireNonNull(file, "Parse file is required");
 
         Map<String, Object> optionsMap = new LinkedHashMap<>();
@@ -783,7 +783,7 @@ public class FirecrawlClient {
      * @param options parse options
      * @return a CompletableFuture that resolves to the parsed Document
      */
-    public CompletableFuture<Document> parseAsync(ParseFile file, ScrapeOptions options) {
+    public CompletableFuture<Document> parseAsync(ParseFile file, ParseOptions options) {
         return CompletableFuture.supplyAsync(() -> parse(file, options), asyncExecutor);
     }
 

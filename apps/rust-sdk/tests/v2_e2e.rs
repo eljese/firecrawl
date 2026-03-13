@@ -8,7 +8,7 @@
 
 use firecrawl::{
     AgentOptions, BatchScrapeOptions, Client, CrawlOptions, Format, JobStatus, MapOptions,
-    ParseFile, ParseOptions, ScrapeOptions, SearchOptions, SitemapMode,
+    ParseFile, ParseFormat, ParseOptions, ScrapeOptions, SearchOptions, SitemapMode,
 };
 use serde_json::json;
 use std::env;
@@ -42,7 +42,7 @@ async fn test_parse() {
     .with_content_type("text/html");
 
     let options = ParseOptions {
-        formats: Some(vec![Format::Markdown]),
+        formats: Some(vec![ParseFormat::Markdown]),
         ..Default::default()
     };
 

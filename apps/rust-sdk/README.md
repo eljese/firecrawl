@@ -46,7 +46,7 @@ match scrape_result {
 Use the v2 client `parse` method to upload local files (`html`, `pdf`, `docx`, etc.) as multipart form data.
 
 ```rust
-use firecrawl::v2::{Client, Format, ParseFile, ParseOptions};
+use firecrawl::v2::{Client, ParseFile, ParseFormat, ParseOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_content_type("text/html");
 
     let options = ParseOptions {
-        formats: Some(vec![Format::Markdown]),
+        formats: Some(vec![ParseFormat::Markdown]),
         ..Default::default()
     };
 

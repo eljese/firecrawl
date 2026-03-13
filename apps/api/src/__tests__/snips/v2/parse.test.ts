@@ -279,4 +279,27 @@ describe("/v2/parse", () => {
     },
     scrapeTimeout,
   );
+
+  it(
+    "rejects changeTracking format for parse uploads",
+    async () => {
+      const failure = await parseWithFailure(
+        {
+          options: {
+            formats: ["markdown", { type: "changeTracking" }],
+          } as any,
+          file: {
+            content: htmlFixture,
+            filename: "upload.html",
+            contentType: "text/html",
+          },
+        },
+        identity,
+      );
+
+      expect(failure.code).toBe("PARSE_UNSUPPORTED_OPTIONS");
+      expect(failure.error).toContain("do not support change tracking");
+    },
+    scrapeTimeout,
+  );
 });

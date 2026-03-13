@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union, Callable, Literal, BinaryIO
 from .types import (
+    ParseOptions,
     ScrapeOptions,
     CrawlRequest,
     WebhookConfig,
@@ -153,7 +154,7 @@ class AsyncFirecrawlClient:
         *,
         filename: Optional[str] = None,
         content_type: Optional[str] = None,
-        options: Optional[ScrapeOptions] = None,
+        options: Optional[ParseOptions] = None,
     ):
         return await async_parse.parse(
             self.async_http_client,

@@ -7,7 +7,7 @@ import mimetypes
 from pathlib import Path
 from typing import Optional, Dict, Any, BinaryIO, Union, Tuple
 
-from ..types import ScrapeOptions, Document
+from ..types import Document, ParseOptions
 from ..utils.normalize import normalize_document_input
 from ..utils import HttpClient, handle_response_error, prepare_scrape_options, validate_scrape_options
 from ..utils.get_version import get_version
@@ -15,6 +15,65 @@ from ..utils.get_version import get_version
 version = get_version()
 
 ParseFileInput = Union[str, bytes, bytearray, Path, BinaryIO]
+UNSUPPORTED_PARSE_FORMATS = {"changeTracking", "screenshot", "branding"}
+
+
+def _extract_format_type(format_item: Any) -> Optional[str]:
+    if isinstance(format_item, str):
+        return format_item
+    if isinstance(format_item, dict):
+        fmt_type = format_item.get("type")
+        return fmt_type if isinstance(fmt_type, str) else None
+    return None
+
+
+def _validate_parse_options_payload(options_payload: Dict[str, Any]) -> None:
+    actions = options_payload.get("actions")
+    if isinstance(actions, list) and len(actions) > 0:
+        raise ValueError("Parse uploads do not support actions.")
+
+    wait_for = options_payload.get("waitFor")
+    if isinstance(wait_for, (int, float)) and wait_for > 0:
+        raise ValueError("Parse uploads do not support waitFor.")
+
+    if options_payload.get("location") is not None:
+        raise ValueError("Parse uploads do not support location overrides.")
+
+    if options_payload.get("mobile"):
+        raise ValueError("Parse uploads do not support mobile rendering.")
+
+    proxy = options_payload.get("proxy")
+    if proxy not in (None, "auto", "basic"):
+        raise ValueError("Parse uploads only support proxy values of auto or basic.")
+
+    for fmt in options_payload.get("formats") or []:
+        fmt_type = _extract_format_type(fmt)
+        if fmt_type in UNSUPPORTED_PARSE_FORMATS:
+            if fmt_type == "changeTracking":
+                raise ValueError("Parse uploads do not support change tracking.")
+            if fmt_type == "screenshot":
+                raise ValueError("Parse uploads do not support screenshot output.")
+            raise ValueError("Parse uploads do not support branding output.")
+
+
+def _prepare_parse_options_payload(
+    options: Optional[ParseOptions],
+) -> Dict[str, Any]:
+    request_data: Dict[str, Any] = {}
+
+    if options is not None:
+        validated = validate_scrape_options(options)
+        if validated is not None:
+            opts = prepare_scrape_options(validated) or {}
+            _validate_parse_options_payload(opts)
+            # Parse is always uncached server-side; avoid sending cache/index hints.
+            opts.pop("maxAge", None)
+            opts.pop("minAge", None)
+            opts.pop("storeInCache", None)
+            request_data.update(opts)
+
+    request_data["origin"] = request_data.get("origin") or f"python-sdk@{version}"
+    return request_data
 
 
 def _prepare_file_payload(
@@ -59,21 +118,12 @@ def _prepare_file_payload(
 
 def _prepare_parse_request(
     file: ParseFileInput,
-    options: Optional[ScrapeOptions] = None,
+    options: Optional[ParseOptions] = None,
     *,
     filename: Optional[str] = None,
     content_type: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Tuple[str, bytes, str]]]:
-    request_data: Dict[str, Any] = {}
-
-    if options is not None:
-        validated = validate_scrape_options(options)
-        if validated is not None:
-            opts = prepare_scrape_options(validated)
-            if opts:
-                request_data.update(opts)
-
-    request_data["origin"] = request_data.get("origin") or f"python-sdk@{version}"
+    request_data = _prepare_parse_options_payload(options)
     multipart_fields = {"options": json.dumps(request_data)}
     multipart_files = _prepare_file_payload(
         file,
@@ -86,7 +136,7 @@ def _prepare_parse_request(
 def parse(
     client: HttpClient,
     file: ParseFileInput,
-    options: Optional[ScrapeOptions] = None,
+    options: Optional[ParseOptions] = None,
     *,
     filename: Optional[str] = None,
     content_type: Optional[str] = None,
