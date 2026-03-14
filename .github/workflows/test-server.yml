@@ -279,23 +279,23 @@ jobs:
           def md(line, f):
               f.write(line + "\n")
 
-          # Print plain text to step log
+          # Print plain text to step log (failures at the end so they're visible on auto-scroll)
           log(f"Test Report ({label}): {tests} tests, {failures} failures, {time_s}s")
-          if failed:
-              log("")
-              log("Failed tests:")
-              for suite, name, t, msg in failed:
-                  log(f"  FAIL  {suite} > {name} ({t}s)")
-                  if msg:
-                      log(f"        {msg}")
           log("")
           log("All tests:")
-          for suite, name, t, _msg in failed:
-              log(f"  ❌ FAIL  {suite} > {name} ({t}s)")
           for suite, name, t in passed:
               log(f"  ✅ PASS  {suite} > {name} ({t}s)")
           for suite, name, t in skipped:
               log(f"  ⏭️ SKIP  {suite} > {name} ({t}s)")
+          for suite, name, t, _msg in failed:
+              log(f"  ❌ FAIL  {suite} > {name} ({t}s)")
+          if failed:
+              log("")
+              log("Failed tests:")
+              for suite, name, t, msg in failed:
+                  log(f"  ❌ {suite} > {name} ({t}s)")
+                  if msg:
+                      log(f"     {msg}")
 
           # Write markdown tables to step summary
           with open(summary, "a") as f:
