@@ -270,6 +270,9 @@ jobs:
           tests = len(failed) + len(passed) + len(skipped)
           failures = len(failed)
 
+          def esc(s):
+              return s.replace("|", "\\|")
+
           def log(line):
               print(line)
 
@@ -309,7 +312,7 @@ jobs:
                   md("| Suite | Test | Time | Message |", f)
                   md("|-------|------|------|---------|", f)
                   for suite, name, t, msg in failed:
-                      md(f"| `{suite}` | **{name}** | {t}s | {msg} |", f)
+                      md(f"| `{esc(suite)}` | **{esc(name)}** | {t}s | {esc(msg)} |", f)
                   md("", f)
 
               md("<details>", f)
@@ -318,11 +321,11 @@ jobs:
               md("| Status | Suite | Test | Time |", f)
               md("|--------|-------|------|------|", f)
               for suite, name, t, _msg in failed:
-                  md(f"| ❌ | `{suite}` | {name} | {t}s |", f)
+                  md(f"| ❌ | `{esc(suite)}` | {esc(name)} | {t}s |", f)
               for suite, name, t in passed:
-                  md(f"| ✅ | `{suite}` | {name} | {t}s |", f)
+                  md(f"| ✅ | `{esc(suite)}` | {esc(name)} | {t}s |", f)
               for suite, name, t in skipped:
-                  md(f"| ⏭️ | `{suite}` | {name} | {t}s |", f)
+                  md(f"| ⏭️ | `{esc(suite)}` | {esc(name)} | {t}s |", f)
               md("", f)
               md("</details>", f)
 
