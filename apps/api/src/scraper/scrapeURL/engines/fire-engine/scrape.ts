@@ -31,7 +31,7 @@ export type FireEngineScrapeRequestCommon = {
   // customProxy?: string; // unused
 
   // disableSmartWaitCache?: boolean; // unused, default: false
-  // skipDnsCheck?: boolean; // unused, default: false
+  skipDnsCheck?: boolean; // default: false
 
   priority?: number; // default: 1
   // team_id?: string; // unused
