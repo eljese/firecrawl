@@ -559,7 +559,7 @@ export function crawlToCrawler(
     regexOnFullURL: sc.crawlerOptions?.regexOnFullURL ?? false,
     maxDiscoveryDepth: sc.crawlerOptions?.maxDiscoveryDepth,
     currentDiscoveryDepth: crawlerOptions?.currentDiscoveryDepth ?? 0,
-    zeroDataRetention: (teamFlags?.forceZDR || sc.zeroDataRetention) ?? false,
+    zeroDataRetention: (teamFlags?.scrapeZDR === "forced" || sc.zeroDataRetention) ?? false,
     location: sc.scrapeOptions?.location,
     headers: sc.scrapeOptions?.headers,
   });

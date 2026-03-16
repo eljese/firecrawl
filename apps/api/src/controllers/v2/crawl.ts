@@ -39,7 +39,7 @@ export async function crawlController(
   }
 
   const zeroDataRetention =
-    req.acuc?.flags?.forceZDR || req.body.zeroDataRetention;
+    req.acuc?.flags?.scrapeZDR === "forced" || req.body.zeroDataRetention;
 
   const id = uuidv7();
   const logger = _logger.child({

@@ -28,7 +28,7 @@ export async function generateLLMsTextController(
   req: RequestWithAuth<{}, GenerateLLMsTextResponse, GenerateLLMsTextRequest>,
   res: Response<GenerateLLMsTextResponse>,
 ) {
-  if (req.acuc?.flags?.forceZDR) {
+  if (req.acuc?.flags?.scrapeZDR === "forced") {
     return res.status(400).json({
       success: false,
       error:

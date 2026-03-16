@@ -105,7 +105,7 @@ export async function extractController(
   const originalRequest = { ...req.body };
   req.body = extractRequestSchema.parse(req.body);
 
-  if (req.acuc?.flags?.forceZDR) {
+  if (req.acuc?.flags?.scrapeZDR === "forced") {
     return res.status(400).json({
       success: false,
       error:
@@ -138,7 +138,7 @@ export async function extractController(
     team_id: req.auth.team_id,
     subId: req.acuc?.sub_id,
     extractId,
-    zeroDataRetention: req.acuc?.flags?.forceZDR,
+    zeroDataRetention: req.acuc?.flags?.scrapeZDR === "forced",
   });
 
   await logRequest({
@@ -193,7 +193,7 @@ export async function extractController(
     showLLMUsage: req.body.__experimental_llmUsage,
     showSources: req.body.__experimental_showSources || req.body.showSources,
     showCostTracking: req.body.__experimental_showCostTracking,
-    zeroDataRetention: req.acuc?.flags?.forceZDR,
+    zeroDataRetention: req.acuc?.flags?.scrapeZDR === "forced",
   });
 
   await addExtractJobToQueue(extractId, jobData);

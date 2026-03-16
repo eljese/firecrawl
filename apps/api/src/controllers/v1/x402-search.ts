@@ -51,7 +51,7 @@ async function scrapeX402SearchResult(
 
   const costTracking = new CostTracking();
 
-  const zeroDataRetention = flags?.forceZDR ?? false;
+  const zeroDataRetention = flags?.searchZDR === "forced" ?? false;
   applyZdrScope(zeroDataRetention);
 
   try {
@@ -185,10 +185,10 @@ export async function x402SearchController(
     teamId: req.auth.team_id,
     module: "x402-search",
     method: "x402SearchController",
-    zeroDataRetention: req.acuc?.flags?.forceZDR,
+    zeroDataRetention: req.acuc?.flags?.searchZDR === "forced",
   });
 
-  if (req.acuc?.flags?.forceZDR) {
+  if (req.acuc?.flags?.searchZDR === "forced") {
     return res.status(400).json({
       success: false,
       error:

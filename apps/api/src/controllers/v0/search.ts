@@ -176,7 +176,7 @@ export async function searchController(req: Request, res: Response) {
     }
     const { team_id, chunk } = auth;
 
-    if (chunk?.flags?.forceZDR) {
+    if (chunk?.flags?.searchZDR === "forced") {
       return res.status(400).json({
         error:
           "Your team has zero data retention enabled. This is not supported on the v0 API. Please update your code to use the v1 API.",

@@ -81,7 +81,7 @@ export async function deepResearchController(
   req: RequestWithAuth<{}, DeepResearchResponse, DeepResearchRequest>,
   res: Response<DeepResearchResponse>,
 ) {
-  if (req.acuc?.flags?.forceZDR) {
+  if (req.acuc?.flags?.scrapeZDR === "forced") {
     return res.status(400).json({
       success: false,
       error:

@@ -61,7 +61,7 @@ async function startX420ScrapeJob(
 ): Promise<string> {
   const jobId = uuidv7();
 
-  const zeroDataRetention = flags?.forceZDR ?? false;
+  const zeroDataRetention = flags?.searchZDR === "forced" ?? false;
   applyZdrScope(zeroDataRetention);
 
   logger.info("Adding scrape job [x402]", {
@@ -210,10 +210,10 @@ export async function x402SearchController(
     teamId: req.auth.team_id,
     module: "api/v2",
     method: "x402SearchController",
-    zeroDataRetention: req.acuc?.flags?.forceZDR,
+    zeroDataRetention: req.acuc?.flags?.searchZDR === "forced",
   });
 
-  if (req.acuc?.flags?.forceZDR) {
+  if (req.acuc?.flags?.searchZDR === "forced") {
     return res.status(400).json({
       success: false,
       error:

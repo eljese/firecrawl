@@ -34,10 +34,10 @@ export async function searchController(
     teamId: req.auth.team_id,
     module: "api/v2",
     method: "searchController",
-    zeroDataRetention: req.acuc?.flags?.forceZDR,
+    zeroDataRetention: req.acuc?.flags?.searchZDR === "forced",
   });
 
-  if (req.acuc?.flags?.forceZDR) {
+  if (req.acuc?.flags?.searchZDR === "forced") {
     return res.status(400).json({
       success: false,
       error:

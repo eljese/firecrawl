@@ -48,7 +48,7 @@ async function scrapeSearchResultDirect(
 ): Promise<DocumentWithCostTracking> {
   const jobId = uuidv7();
   const zeroDataRetention =
-    flags?.forceZDR || (options.zeroDataRetention ?? false);
+    flags?.scrapeZDR === "forced" || (options.zeroDataRetention ?? false);
 
   logger.debug("Starting direct scrape for search result", {
     scrapeId: jobId,

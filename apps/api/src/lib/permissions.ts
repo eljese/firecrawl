@@ -16,8 +16,12 @@ export function checkPermissions(
   request: APIRequest,
   flags?: TeamFlags,
 ): { error?: string } {
-  // zdr perms
-  if (request.zeroDataRetention && !flags?.allowZDR) {
+  // zdr perms — scrapeZDR must be 'allowed' or 'forced' for request-scoped ZDR
+  if (
+    request.zeroDataRetention &&
+    flags?.scrapeZDR !== "allowed" &&
+    flags?.scrapeZDR !== "forced"
+  ) {
     return {
       error: `Zero Data Retention (ZDR) is not enabled for your team. Contact ${SUPPORT_EMAIL} to enable this feature.`,
     };

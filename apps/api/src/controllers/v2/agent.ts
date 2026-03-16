@@ -24,13 +24,13 @@ export async function agentController(
     team_id: req.auth.team_id,
     module: "api/v2",
     method: "agentController",
-    zeroDataRetention: req.acuc?.flags?.forceZDR,
+    zeroDataRetention: req.acuc?.flags?.scrapeZDR === "forced",
   });
 
   const originalRequest = { ...req.body };
   req.body = agentRequestSchema.parse(req.body);
 
-  if (req.acuc?.flags?.forceZDR) {
+  if (req.acuc?.flags?.scrapeZDR === "forced") {
     return res.status(400).json({
       success: false,
       error:
@@ -42,7 +42,7 @@ export async function agentController(
     request: req.body,
     originalRequest,
     subId: req.acuc?.sub_id,
-    zeroDataRetention: req.acuc?.flags?.forceZDR,
+    zeroDataRetention: req.acuc?.flags?.scrapeZDR === "forced",
   });
 
   if (!config.EXTRACT_V3_BETA_URL) {

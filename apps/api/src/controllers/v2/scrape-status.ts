@@ -18,10 +18,10 @@ export async function scrapeStatusController(req: any, res: any) {
     teamId: req.auth.team_id,
     jobId: req.params.jobId,
     scrapeId: req.params.jobId,
-    zeroDataRetention: req.acuc?.flags?.forceZDR,
+    zeroDataRetention: req.acuc?.flags?.scrapeZDR === "forced",
   });
 
-  if (req.acuc?.flags?.forceZDR) {
+  if (req.acuc?.flags?.scrapeZDR === "forced") {
     return res.status(400).json({
       success: false,
       error:

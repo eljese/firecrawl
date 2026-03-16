@@ -130,7 +130,7 @@ export async function getMapResults({
 
   const id = providedId ?? uuidv7();
   let mapResults: MapDocument[] = [];
-  const zeroDataRetention = flags?.forceZDR || false;
+  const zeroDataRetention = flags?.scrapeZDR === "forced" || false;
 
   const sc: StoredCrawl = {
     originUrl: url,

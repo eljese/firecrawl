@@ -90,11 +90,11 @@ export async function searchController(
     teamId: req.auth.team_id,
     module: "search",
     method: "searchController",
-    zeroDataRetention: req.acuc?.flags?.forceZDR,
+    zeroDataRetention: req.acuc?.flags?.searchZDR === "forced",
     searchQuery: req.body.query.slice(0, 100),
   });
 
-  if (req.acuc?.flags?.forceZDR) {
+  if (req.acuc?.flags?.searchZDR === "forced") {
     return res.status(400).json({
       success: false,
       error:

@@ -26,7 +26,7 @@ export async function mapController(
     teamId: req.auth.team_id,
     module: "api/v2",
     method: "mapController",
-    zeroDataRetention: req.acuc?.flags?.forceZDR,
+    zeroDataRetention: req.acuc?.flags?.scrapeZDR === "forced",
   });
   // Get timing data from middleware (includes all middleware processing time)
   const middlewareStartTime =
