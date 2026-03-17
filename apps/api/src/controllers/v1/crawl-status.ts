@@ -234,6 +234,21 @@ export async function crawlStatusController(
     outputBulkA.status = "failed";
   }
 
+  // If the group is still "active" but all single_urls jobs have reached terminal
+  // state (no active/queued/backlog remaining), and the kickoff is finished, the
+  // crawl is effectively completed. This handles the case where all scrape jobs
+  // fail and the group status never transitions to "completed".
+  if (
+    outputBulkA.status === "scraping" &&
+    (numericStats.active ?? 0) === 0 &&
+    (numericStats.queued ?? 0) === 0 &&
+    (numericStats.backlog ?? 0) === 0 &&
+    (numericStats.completed ?? 0) + (numericStats.failed ?? 0) > 0 &&
+    (await isCrawlKickoffFinished(req.params.jobId))
+  ) {
+    outputBulkA.status = "completed";
+  }
+
   // if the crawl failed during kickoff, return immediately without fetching/processing jobs (there are none)
   if (outputBulkA.status === "failed" && crawlError) {
     return res.status(200).json({
