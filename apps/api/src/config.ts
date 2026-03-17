@@ -159,7 +159,7 @@ const configSchema = z.object({
 
   // Self-Hosted OCR Experiment
   PDF_OCR_EXPERIMENT_ENABLE: z.stringbool().optional(),
-  PDF_OCR_EXPERIMENT_PERCENT: z.coerce.number().default(10),
+  PDF_OCR_EXPERIMENT_PERCENT: z.coerce.number().min(0).max(100).default(10),
   PDF_OCR_BASE_URL: z.string().optional(),
   PDF_OCR_API_KEY: z.string().optional(),
 

@@ -210,12 +210,14 @@ export async function scrapePDFWithRunPodMU(
       url: meta.rewrittenUrl ?? meta.url,
       pagesProcessed,
     });
-    runSelfHostedOCRExperiment(
-      meta,
-      base64Content,
-      { markdown: result.markdown, durationMs },
-      maxPages,
-    );
+    if (!meta.internalOptions.zeroDataRetention) {
+      runSelfHostedOCRExperiment(
+        meta,
+        base64Content,
+        { markdown: result.markdown, durationMs },
+        maxPages,
+      );
+    }
   }
 
   return processorResult;
