@@ -17,6 +17,7 @@ const VALID_KINDS = [
   "deep_research",
   "map",
   "agent",
+  "browser",
 ] as const;
 
 type ActivityKind = (typeof VALID_KINDS)[number];
@@ -27,8 +28,6 @@ interface ActivityItem {
   api_version: string;
   created_at: string;
   target: string | null;
-  origin: string | null;
-  integration: string | null;
 }
 
 interface ActivityResponse {
@@ -72,7 +71,7 @@ export async function activityController(
 
   let query = supabase_rr_service
     .from("requests")
-    .select("id, kind, api_version, created_at, target_hint, origin, integration")
+    .select("id, kind, api_version, created_at, target_hint")
     .eq("team_id", req.auth.team_id)
     .gte("created_at", windowStart)
     .order("id", { ascending: false })
@@ -105,8 +104,6 @@ export async function activityController(
     api_version: row.api_version,
     created_at: row.created_at,
     target: row.target_hint,
-    origin: row.origin,
-    integration: row.integration,
   }));
 
   const nextCursor =
