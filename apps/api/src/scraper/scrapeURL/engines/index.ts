@@ -500,11 +500,10 @@ export async function buildFallbackList(meta: Meta): Promise<
   ];
 
   if (meta.internalOptions.agentIndexOnly) {
-    const indexEngines: Engine[] = ["index", "index;documents"];
+    const indexEngines: Engine[] = useIndex ? ["index", "index;documents"] : [];
     _engines.length = 0;
-    for (const e of indexEngines) {
-      if (useIndex) _engines.push(e);
-    }
+    _engines.push(...indexEngines);
+    meta.internalOptions.forceEngine = indexEngines;
   } else if (!shouldUseIndex(meta)) {
     const indexIndex = _engines.indexOf("index");
     if (indexIndex !== -1) {
