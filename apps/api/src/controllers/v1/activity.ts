@@ -7,7 +7,7 @@ const ACTIVITY_WINDOW_HOURS = 24;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
-const VALID_KINDS = [
+const VALID_ENDPOINTS = [
   "scrape",
   "crawl",
   "batch_scrape",
@@ -20,11 +20,11 @@ const VALID_KINDS = [
   "browser",
 ] as const;
 
-type ActivityKind = (typeof VALID_KINDS)[number];
+type ActivityEndpoint = (typeof VALID_ENDPOINTS)[number];
 
 interface ActivityItem {
   id: string;
-  kind: ActivityKind;
+  endpoint: ActivityEndpoint;
   api_version: string;
   created_at: string;
   target: string | null;
@@ -33,7 +33,7 @@ interface ActivityItem {
 interface ActivityResponse {
   success: true;
   data: ActivityItem[];
-  next_cursor: string | null;
+  cursor: string | null;
   has_more: boolean;
 }
 
@@ -48,11 +48,11 @@ export async function activityController(
   });
 
   // Parse and validate query params
-  const kind = req.query.kind as string | undefined;
-  if (kind && !VALID_KINDS.includes(kind as ActivityKind)) {
+  const endpoint = req.query.endpoint as string | undefined;
+  if (endpoint && !VALID_ENDPOINTS.includes(endpoint as ActivityEndpoint)) {
     return res.status(400).json({
       success: false,
-      error: `Invalid kind filter. Must be one of: ${VALID_KINDS.join(", ")}`,
+      error: `Invalid endpoint filter. Must be one of: ${VALID_ENDPOINTS.join(", ")}`,
     });
   }
 
@@ -77,8 +77,8 @@ export async function activityController(
     .order("id", { ascending: false })
     .limit(limit + 1); // fetch one extra to determine has_more
 
-  if (kind) {
-    query = query.eq("kind", kind);
+  if (endpoint) {
+    query = query.eq("kind", endpoint);
   }
 
   if (cursor) {
@@ -100,7 +100,7 @@ export async function activityController(
 
   const responseData: ActivityItem[] = items.map((row: any) => ({
     id: row.id,
-    kind: row.kind,
+    endpoint: row.kind,
     api_version: row.api_version,
     created_at: row.created_at,
     target: row.target_hint,
@@ -114,7 +114,7 @@ export async function activityController(
   return res.status(200).json({
     success: true,
     data: responseData,
-    next_cursor: nextCursor,
+    cursor: nextCursor,
     has_more: hasMore,
   });
 }
