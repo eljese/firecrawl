@@ -147,7 +147,7 @@ describe("Scrape browser execute replay", () => {
     expect(response.body.error).toBe("Job not found.");
   });
 
-  itIf(ALLOW_TEST_SUITE_WEBSITE)(
+  itIf(ALLOW_TEST_SUITE_WEBSITE && !!config.IDMUX_URL)(
     "returns 403 when scrape job belongs to another team",
     async () => {
       const scrapeResponse = await scrapeRaw(
