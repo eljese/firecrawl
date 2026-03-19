@@ -66,7 +66,7 @@ export class WebhookSender {
     if (data.awaitWebhook) {
       await delivery;
     } else {
-      delivery.catch(() => {});
+      await delivery.catch(() => {});
     }
   }
 

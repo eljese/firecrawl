@@ -537,13 +537,13 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
             ? data.result.links.map(x => x.content)
             : [];
           if (job.data.crawlerOptions !== null) {
-            sender.send(WebhookEvent.CRAWL_PAGE, {
+            await sender.send(WebhookEvent.CRAWL_PAGE, {
               success: true,
               data: documents,
               scrapeId: job.id,
             });
           } else {
-            sender.send(WebhookEvent.BATCH_SCRAPE_PAGE, {
+            await sender.send(WebhookEvent.BATCH_SCRAPE_PAGE, {
               success: true,
               data: documents,
               scrapeId: job.id,
@@ -694,7 +694,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
 
       if (sender) {
         if (job.data.crawlerOptions !== null) {
-          sender.send(WebhookEvent.CRAWL_PAGE, {
+          await sender.send(WebhookEvent.CRAWL_PAGE, {
             success: false,
             error: data.error.message,
             data: [
@@ -705,7 +705,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
             scrapeId: job.id,
           });
         } else {
-          sender.send(WebhookEvent.BATCH_SCRAPE_PAGE, {
+          await sender.send(WebhookEvent.BATCH_SCRAPE_PAGE, {
             success: false,
             error: data.error.message,
             data: [
