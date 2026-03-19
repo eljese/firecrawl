@@ -662,6 +662,22 @@ async function main() {
           },
         },
       },
+      "/extract/{jobId}": {
+        get: {
+          tags: ["Extract"],
+          operationId: "Extract Status",
+          security: [{ bearerAuth: [] }],
+          parameters: zodObjectToParameters(jobIdParamsSchema, "path"),
+          responses: {
+            "200": {
+              description: "Successful response",
+              content: {
+                "application/json": { schema: schemaRef("ExtractResponse") },
+              },
+            },
+          },
+        },
+      },
       "/agent": {
         post: {
           tags: ["Agent"],

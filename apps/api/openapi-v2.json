@@ -221,6 +221,21 @@
                   },
                   "required": ["type"],
                   "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "query"
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "maxLength": 10000
+                    }
+                  },
+                  "required": ["type", "prompt"],
+                  "additionalProperties": false
                 }
               ]
             }
@@ -250,9 +265,12 @@
             "default": true,
             "type": "boolean"
           },
+          "onlyCleanContent": {
+            "type": "boolean"
+          },
           "timeout": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "minimum": 1000,
             "maximum": 9007199254740991
           },
           "waitFor": {
@@ -278,6 +296,10 @@
                     "type": {
                       "type": "string",
                       "const": "pdf"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["fast", "auto", "ocr"]
                     },
                     "maxPages": {
                       "type": "integer",
@@ -501,7 +523,7 @@
           "proxy": {
             "default": "auto",
             "type": "string",
-            "enum": ["basic", "stealth", "auto"]
+            "enum": ["basic", "stealth", "enhanced", "auto"]
           },
           "maxAge": {
             "type": "integer",
@@ -736,6 +758,21 @@
                   },
                   "required": ["type"],
                   "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "query"
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "maxLength": 10000
+                    }
+                  },
+                  "required": ["type", "prompt"],
+                  "additionalProperties": false
                 }
               ]
             }
@@ -765,9 +802,12 @@
             "default": true,
             "type": "boolean"
           },
+          "onlyCleanContent": {
+            "type": "boolean"
+          },
           "timeout": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "minimum": 1000,
             "maximum": 9007199254740991
           },
           "waitFor": {
@@ -793,6 +833,10 @@
                     "type": {
                       "type": "string",
                       "const": "pdf"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["fast", "auto", "ocr"]
                     },
                     "maxPages": {
                       "type": "integer",
@@ -1016,7 +1060,7 @@
           "proxy": {
             "default": "auto",
             "type": "string",
-            "enum": ["basic", "stealth", "auto"]
+            "enum": ["basic", "stealth", "enhanced", "auto"]
           },
           "maxAge": {
             "type": "integer",
@@ -1146,7 +1190,7 @@
           "sitemap": {
             "default": "include",
             "type": "string",
-            "enum": ["skip", "include"]
+            "enum": ["skip", "include", "only"]
           },
           "deduplicateSimilarURLs": {
             "default": true,
@@ -1181,6 +1225,7 @@
                 }
               ],
               "onlyMainContent": true,
+              "onlyCleanContent": false,
               "waitFor": 0,
               "mobile": false,
               "parsers": ["pdf"],
@@ -1390,6 +1435,21 @@
                       },
                       "required": ["type"],
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "query"
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "maxLength": 10000
+                        }
+                      },
+                      "required": ["type", "prompt"],
+                      "additionalProperties": false
                     }
                   ]
                 }
@@ -1419,9 +1479,12 @@
                 "default": true,
                 "type": "boolean"
               },
+              "onlyCleanContent": {
+                "type": "boolean"
+              },
               "timeout": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 1000,
                 "maximum": 9007199254740991
               },
               "waitFor": {
@@ -1447,6 +1510,10 @@
                         "type": {
                           "type": "string",
                           "const": "pdf"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": ["fast", "auto", "ocr"]
                         },
                         "maxPages": {
                           "type": "integer",
@@ -1670,7 +1737,7 @@
               "proxy": {
                 "default": "auto",
                 "type": "string",
-                "enum": ["basic", "stealth", "auto"]
+                "enum": ["basic", "stealth", "enhanced", "auto"]
               },
               "maxAge": {
                 "type": "integer",
@@ -1836,6 +1903,9 @@
             "default": true,
             "type": "boolean"
           },
+          "ignoreCache": {
+            "type": "boolean"
+          },
           "location": {
             "type": "object",
             "properties": {
@@ -1848,6 +1918,15 @@
                   "type": "string"
                 }
               }
+            }
+          },
+          "headers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
             }
           }
         },
@@ -2121,6 +2200,21 @@
                       "properties": {
                         "type": {
                           "type": "string",
+                          "const": "query"
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "maxLength": 10000
+                        }
+                      },
+                      "required": ["type", "prompt"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
                           "const": "screenshot"
                         },
                         "fullPage": {
@@ -2178,9 +2272,12 @@
                 "default": true,
                 "type": "boolean"
               },
+              "onlyCleanContent": {
+                "type": "boolean"
+              },
               "timeout": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 1000,
                 "maximum": 9007199254740991
               },
               "waitFor": {
@@ -2206,6 +2303,10 @@
                         "type": {
                           "type": "string",
                           "const": "pdf"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": ["fast", "auto", "ocr"]
                         },
                         "maxPages": {
                           "type": "integer",
@@ -2429,7 +2530,7 @@
               "proxy": {
                 "default": "auto",
                 "type": "string",
-                "enum": ["basic", "stealth", "auto"]
+                "enum": ["basic", "stealth", "enhanced", "auto"]
               },
               "maxAge": {
                 "type": "integer",
@@ -2692,6 +2793,21 @@
                       },
                       "required": ["type"],
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "query"
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "maxLength": 10000
+                        }
+                      },
+                      "required": ["type", "prompt"],
+                      "additionalProperties": false
                     }
                   ]
                 }
@@ -2721,9 +2837,12 @@
                 "default": true,
                 "type": "boolean"
               },
+              "onlyCleanContent": {
+                "type": "boolean"
+              },
               "timeout": {
                 "type": "integer",
-                "exclusiveMinimum": 0,
+                "minimum": 1000,
                 "maximum": 9007199254740991
               },
               "waitFor": {
@@ -2749,6 +2868,10 @@
                         "type": {
                           "type": "string",
                           "const": "pdf"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": ["fast", "auto", "ocr"]
                         },
                         "maxPages": {
                           "type": "integer",
@@ -2972,7 +3095,7 @@
               "proxy": {
                 "default": "auto",
                 "type": "string",
-                "enum": ["basic", "stealth", "auto"]
+                "enum": ["basic", "stealth", "enhanced", "auto"]
               },
               "maxAge": {
                 "type": "integer",
@@ -3004,7 +3127,7 @@
           },
           "timeout": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "minimum": 1000,
             "maximum": 9007199254740991
           },
           "agent": {
@@ -3094,8 +3217,64 @@
           "strictConstrainToURLs": {
             "type": "boolean"
           },
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "headers": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "metadata": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "events": {
+                "default": [
+                  "started",
+                  "action",
+                  "completed",
+                  "failed",
+                  "cancelled"
+                ],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "started",
+                    "action",
+                    "completed",
+                    "failed",
+                    "cancelled"
+                  ]
+                }
+              }
+            },
+            "required": ["url"],
+            "additionalProperties": false
+          },
           "overrideWhitelist": {
             "type": "string"
+          },
+          "model": {
+            "default": "spark-1-pro",
+            "type": "string",
+            "enum": ["spark-1-pro", "spark-1-mini"]
           }
         },
         "required": ["prompt"],
@@ -4439,6 +4618,41 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/extract/{jobId}": {
+      "get": {
+        "tags": ["Extract"],
+        "operationId": "Extract Status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response",
