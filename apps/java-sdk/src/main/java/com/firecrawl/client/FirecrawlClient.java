@@ -101,6 +101,64 @@ public class FirecrawlClient {
         return extractData(http.post("/v2/scrape", body, Map.class), Document.class);
     }
 
+    /**
+     * Executes code in the scrape-bound browser session for a scrape job.
+     *
+     * @param jobId the scrape job ID
+     * @param code  the code to execute
+     * @return the execution result including stdout, stderr, and exit code
+     */
+    public BrowserExecuteResponse scrapeExecute(String jobId, String code) {
+        return scrapeExecute(jobId, code, "node", null, null);
+    }
+
+    /**
+     * Executes code in the scrape-bound browser session for a scrape job.
+     *
+     * @param jobId    the scrape job ID
+     * @param code     the code to execute
+     * @param language the language: "python", "node", or "bash" (default: "node")
+     * @param timeout  execution timeout in seconds (1-300), or null for default (30)
+     * @return the execution result including stdout, stderr, and exit code
+     */
+    public BrowserExecuteResponse scrapeExecute(String jobId, String code,
+                                                String language, Integer timeout) {
+        return scrapeExecute(jobId, code, language, timeout, null);
+    }
+
+    /**
+     * Executes code in the scrape-bound browser session for a scrape job.
+     *
+     * @param jobId    the scrape job ID
+     * @param code     the code to execute
+     * @param language the language: "python", "node", or "bash" (default: "node")
+     * @param timeout  execution timeout in seconds (1-300), or null for default (30)
+     * @param origin   optional origin tag for request attribution
+     * @return the execution result including stdout, stderr, and exit code
+     */
+    public BrowserExecuteResponse scrapeExecute(String jobId, String code,
+                                                String language, Integer timeout, String origin) {
+        Objects.requireNonNull(jobId, "Job ID is required");
+        Objects.requireNonNull(code, "Code is required");
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("code", code);
+        body.put("language", language != null ? language : "node");
+        if (timeout != null) body.put("timeout", timeout);
+        if (origin != null) body.put("origin", origin);
+        return http.post("/v2/scrape/" + jobId + "/execute", body, BrowserExecuteResponse.class);
+    }
+
+    /**
+     * Deletes the scrape-bound browser session for a scrape job.
+     *
+     * @param jobId the scrape job ID
+     * @return the deletion response with session duration and billing info
+     */
+    public BrowserDeleteResponse deleteScrapeBrowser(String jobId) {
+        Objects.requireNonNull(jobId, "Job ID is required");
+        return http.delete("/v2/scrape/" + jobId + "/browser", BrowserDeleteResponse.class);
+    }
+
     // ================================================================
     // CRAWL
     // ================================================================
@@ -529,6 +587,62 @@ public class FirecrawlClient {
      */
     public CompletableFuture<Document> scrapeAsync(String url, ScrapeOptions options) {
         return CompletableFuture.supplyAsync(() -> scrape(url, options), asyncExecutor);
+    }
+
+    /**
+     * Asynchronously executes code in a scrape-bound browser session.
+     *
+     * @param jobId the scrape job ID
+     * @param code  the code to execute
+     * @return a CompletableFuture that resolves to the BrowserExecuteResponse
+     */
+    public CompletableFuture<BrowserExecuteResponse> scrapeExecuteAsync(String jobId, String code) {
+        return CompletableFuture.supplyAsync(() -> scrapeExecute(jobId, code), asyncExecutor);
+    }
+
+    /**
+     * Asynchronously executes code in a scrape-bound browser session.
+     *
+     * @param jobId    the scrape job ID
+     * @param code     the code to execute
+     * @param language the language: "python", "node", or "bash"
+     * @param timeout  execution timeout in seconds, or null for default
+     * @return a CompletableFuture that resolves to the BrowserExecuteResponse
+     */
+    public CompletableFuture<BrowserExecuteResponse> scrapeExecuteAsync(String jobId, String code,
+                                                                        String language, Integer timeout) {
+        return CompletableFuture.supplyAsync(
+                () -> scrapeExecute(jobId, code, language, timeout),
+                asyncExecutor
+        );
+    }
+
+    /**
+     * Asynchronously executes code in a scrape-bound browser session.
+     *
+     * @param jobId    the scrape job ID
+     * @param code     the code to execute
+     * @param language the language: "python", "node", or "bash"
+     * @param timeout  execution timeout in seconds, or null for default
+     * @param origin   optional origin tag for request attribution
+     * @return a CompletableFuture that resolves to the BrowserExecuteResponse
+     */
+    public CompletableFuture<BrowserExecuteResponse> scrapeExecuteAsync(String jobId, String code,
+                                                                        String language, Integer timeout, String origin) {
+        return CompletableFuture.supplyAsync(
+                () -> scrapeExecute(jobId, code, language, timeout, origin),
+                asyncExecutor
+        );
+    }
+
+    /**
+     * Asynchronously deletes a scrape-bound browser session.
+     *
+     * @param jobId the scrape job ID
+     * @return a CompletableFuture that resolves to the BrowserDeleteResponse
+     */
+    public CompletableFuture<BrowserDeleteResponse> deleteScrapeBrowserAsync(String jobId) {
+        return CompletableFuture.supplyAsync(() -> deleteScrapeBrowser(jobId), asyncExecutor);
     }
 
     /**

@@ -105,12 +105,42 @@ class FirecrawlClientTest {
     }
 
     @Test
+    void testScrapeExecuteRequiresJobId() {
+        FirecrawlClient client = FirecrawlClient.builder()
+                .apiKey("fc-test-key")
+                .build();
+        assertThrows(NullPointerException.class, () ->
+                client.scrapeExecute(null, "console.log('hi')")
+        );
+    }
+
+    @Test
+    void testScrapeExecuteRequiresCode() {
+        FirecrawlClient client = FirecrawlClient.builder()
+                .apiKey("fc-test-key")
+                .build();
+        assertThrows(NullPointerException.class, () ->
+                client.scrapeExecute("job-id", null)
+        );
+    }
+
+    @Test
     void testBrowserDeleteRequiresSessionId() {
         FirecrawlClient client = FirecrawlClient.builder()
                 .apiKey("fc-test-key")
                 .build();
         assertThrows(NullPointerException.class, () ->
                 client.deleteBrowser(null)
+        );
+    }
+
+    @Test
+    void testDeleteScrapeBrowserRequiresJobId() {
+        FirecrawlClient client = FirecrawlClient.builder()
+                .apiKey("fc-test-key")
+                .build();
+        assertThrows(NullPointerException.class, () ->
+                client.deleteScrapeBrowser(null)
         );
     }
 
