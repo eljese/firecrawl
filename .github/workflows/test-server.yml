@@ -158,7 +158,7 @@ jobs:
 
       - name: Install Playwright system deps
         if: matrix.engine == 'playwright'
-        run: pnpm exec playwright install-deps
+        run: pnpm exec playwright install-deps chromium
         working-directory: ./apps/playwright-service-ts
 
       - name: Install Playwright Chromium
