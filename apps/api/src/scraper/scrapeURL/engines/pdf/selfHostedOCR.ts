@@ -2,6 +2,8 @@ import { Meta } from "../..";
 import { config } from "../../../../config";
 import { robustFetch } from "../../lib/fetch";
 import { z } from "zod";
+import * as marked from "marked";
+import type { PDFProcessorResult } from "./types";
 
 /**
  * Compute word-level Jaccard similarity between two texts.
@@ -96,4 +98,62 @@ export function runSelfHostedOCRExperiment(
       // Non-blocking: instance may be down at any time, silently skip
     }
   })();
+}
+
+const selfHostedOCRResponseSchema = z.object({
+  markdown: z.string(),
+  failed_pages: z.array(z.number()).nullable(),
+  pages_processed: z.number().optional(),
+});
+
+export async function scrapePDFWithSelfHostedOCR(
+  meta: Meta,
+  base64Content: string,
+  maxPages?: number,
+  pagesProcessed?: number,
+): Promise<PDFProcessorResult> {
+  const startedAt = Date.now();
+  const logger = meta.logger.child({ method: "scrapePDF/selfHostedOCRLive" });
+
+  logger.info("Self-hosted OCR live started", {
+    scrapeId: meta.id,
+    url: meta.rewrittenUrl ?? meta.url,
+    maxPages,
+    pagesProcessed,
+  });
+
+  const resp = await robustFetch({
+    url: `${config.PDF_OCR_BASE_URL}/ocr`,
+    method: "POST",
+    headers: config.PDF_OCR_API_KEY
+      ? { Authorization: `Bearer ${config.PDF_OCR_API_KEY}` }
+      : undefined,
+    body: {
+      pdf: base64Content,
+      scrape_id: meta.id,
+      ...(maxPages !== undefined && { max_pages: maxPages }),
+    },
+    logger,
+    schema: selfHostedOCRResponseSchema,
+    mock: meta.mock,
+    abort: meta.abort.asSignal(),
+  });
+
+  const durationMs = Date.now() - startedAt;
+  const pages = resp.pages_processed ?? pagesProcessed;
+
+  logger.info("Self-hosted OCR live completed", {
+    scrapeId: meta.id,
+    url: meta.rewrittenUrl ?? meta.url,
+    durationMs,
+    markdownLength: resp.markdown.length,
+    failedPages: resp.failed_pages,
+    pagesProcessed: pages,
+    perPageMs: pages ? Math.round(durationMs / pages) : undefined,
+  });
+
+  return {
+    markdown: resp.markdown,
+    html: await marked.parse(resp.markdown, { async: true }),
+  };
 }

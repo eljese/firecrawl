@@ -33,6 +33,7 @@ import { scrapePDFWithParsePDF } from "./pdfParse";
 import { captureExceptionWithZdrCheck } from "../../../../services/sentry";
 import { isPdfBuffer, PDF_SNIFF_WINDOW } from "./pdfUtils";
 import { comparePdfOutputs } from "./shadowComparison";
+import { scrapePDFWithSelfHostedOCR } from "./selfHostedOCR";
 
 /** Check if the PDF is eligible for Rust extraction, returning a rejection reason or null. */
 function getIneligibleReason(
@@ -339,7 +340,43 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
     if (!result && !skipOCR) {
       const base64Content = (await readFile(tempFilePath)).toString("base64");
 
+      // Self-hosted OCR live routing: route a percentage of traffic
+      // to the self-hosted OCR service. Falls back to MU on failure.
+      const useSelfHostedOCR =
+        config.PDF_OCR_LIVE_ENABLE &&
+        config.PDF_OCR_BASE_URL &&
+        base64Content.length < MAX_FILE_SIZE &&
+        Math.random() * 100 < config.PDF_OCR_LIVE_PERCENT;
+
+      if (useSelfHostedOCR) {
+        try {
+          result = await scrapePDFWithSelfHostedOCR(
+            {
+              ...meta,
+              logger: meta.logger.child({
+                method: "scrapePDF/selfHostedOCRLive",
+              }),
+            },
+            base64Content,
+            maxPages,
+            effectivePageCount,
+          );
+        } catch (error) {
+          if (
+            error instanceof RemoveFeatureError ||
+            error instanceof AbortManagerThrownError
+          ) {
+            throw error;
+          }
+          meta.logger.warn(
+            "Self-hosted OCR failed, falling back to MU/pdfParse",
+            { error },
+          );
+        }
+      }
+
       if (
+        !result &&
         base64Content.length < MAX_FILE_SIZE &&
         config.RUNPOD_MU_API_KEY &&
         config.RUNPOD_MU_POD_ID

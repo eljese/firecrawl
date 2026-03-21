@@ -164,6 +164,10 @@ const configSchema = z.object({
   PDF_OCR_BASE_URL: z.string().optional(),
   PDF_OCR_API_KEY: z.string().optional(),
 
+  // Self-Hosted OCR Live Traffic
+  PDF_OCR_LIVE_ENABLE: z.stringbool().optional(),
+  PDF_OCR_LIVE_PERCENT: z.coerce.number().min(0).max(100).default(0),
+
   // RunPod
   RUNPOD_MU_API_KEY: z.string().optional(),
   RUNPOD_MU_POD_ID: z.string().optional(),
