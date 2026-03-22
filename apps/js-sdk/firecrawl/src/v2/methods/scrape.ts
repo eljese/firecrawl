@@ -38,14 +38,16 @@ export async function interact(
   if (!jobId || !jobId.trim()) {
     throw new Error("Job ID cannot be empty");
   }
-  if (!args?.code || !args.code.trim()) {
-    throw new Error("Code cannot be empty");
+  const hasCode = args?.code && args.code.trim();
+  const hasPrompt = args?.prompt && args.prompt.trim();
+  if (!hasCode && !hasPrompt) {
+    throw new Error("Either 'code' or 'prompt' must be provided");
   }
 
-  const body: Record<string, unknown> = {
-    code: args.code,
-    language: args.language ?? "node",
-  };
+  const body: Record<string, unknown> = {};
+  if (hasCode) body.code = args.code;
+  if (hasPrompt) body.prompt = args.prompt;
+  body.language = args.language ?? "node";
   if (args.timeout != null) body.timeout = args.timeout;
   if (args.origin) body.origin = args.origin;
 

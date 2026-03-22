@@ -132,13 +132,17 @@ pub enum ScrapeExecuteLanguage {
     Bash,
 }
 
-/// Options for executing code in a scrape-bound browser session.
+/// Options for executing code or a prompt in a scrape-bound browser session.
+///
+/// At least one of `code` or `prompt` must be provided.
 #[serde_with::skip_serializing_none]
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ScrapeExecuteOptions {
-    /// Code to execute.
-    pub code: String,
+    /// Code to execute (optional if `prompt` is provided).
+    pub code: Option<String>,
+    /// Natural-language instruction for the browser agent (optional if `code` is provided).
+    pub prompt: Option<String>,
     /// Runtime language for the code.
     pub language: Option<ScrapeExecuteLanguage>,
     /// Execution timeout in seconds.
@@ -154,6 +158,12 @@ pub struct ScrapeExecuteOptions {
 pub struct ScrapeExecuteResponse {
     /// Whether the request succeeded.
     pub success: bool,
+    /// Live-view URL for the browser session.
+    pub live_view_url: Option<String>,
+    /// Interactive live-view URL for the browser session.
+    pub interactive_live_view_url: Option<String>,
+    /// Agent output when a prompt was used.
+    pub output: Option<String>,
     /// Captured stdout from execution.
     pub stdout: Option<String>,
     /// Optional execution result payload.
@@ -574,7 +584,7 @@ mod tests {
             .interact(
                 "job-123",
                 ScrapeExecuteOptions {
-                    code: "console.log('ok')".to_string(),
+                    code: Some("console.log('ok')".to_string()),
                     timeout: Some(30),
                     ..Default::default()
                 },
@@ -585,6 +595,47 @@ mod tests {
         assert!(response.success);
         assert_eq!(response.exit_code, Some(0));
         assert_eq!(response.result, Some("done".to_string()));
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_interact_with_prompt() {
+        let mut server = mockito::Server::new_async().await;
+
+        let mock = server
+            .mock("POST", "/v2/scrape/job-789/interact")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                json!({
+                    "success": true,
+                    "output": "Clicked the login button",
+                    "liveViewUrl": "https://live.example.com/view",
+                    "interactiveLiveViewUrl": "https://live.example.com/interactive",
+                    "stdout": "",
+                    "exitCode": 0,
+                    "killed": false
+                })
+                .to_string(),
+            )
+            .create();
+
+        let client = Client::new_selfhosted(server.url(), Some("test_key")).unwrap();
+        let response = client
+            .interact(
+                "job-789",
+                ScrapeExecuteOptions {
+                    prompt: Some("Click the login button".to_string()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        assert!(response.success);
+        assert_eq!(response.output, Some("Clicked the login button".to_string()));
+        assert_eq!(response.live_view_url, Some("https://live.example.com/view".to_string()));
+        assert_eq!(response.interactive_live_view_url, Some("https://live.example.com/interactive".to_string()));
         mock.assert();
     }
 
@@ -637,7 +688,7 @@ mod tests {
             .interact(
                 "job-404",
                 ScrapeExecuteOptions {
-                    code: "console.log('ok')".to_string(),
+                    code: Some("console.log('ok')".to_string()),
                     ..Default::default()
                 },
             )

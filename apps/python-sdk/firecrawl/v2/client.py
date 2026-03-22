@@ -188,8 +188,9 @@ class FirecrawlClient:
     def interact(
         self,
         job_id: str,
-        code: str,
+        code: Optional[str] = None,
         *,
+        prompt: Optional[str] = None,
         language: Literal["python", "node", "bash"] = "node",
         timeout: Optional[int] = None,
         origin: Optional[str] = None,
@@ -197,9 +198,12 @@ class FirecrawlClient:
         """
         Interact with the browser session associated with a scrape job.
 
+        Either ``code`` or ``prompt`` must be provided.
+
         Args:
             job_id: Scrape job ID
-            code: Code to execute
+            code: Code to execute (optional if prompt is provided)
+            prompt: Natural-language instruction for the browser agent (optional if code is provided)
             language: Programming language ("python", "node", or "bash")
             timeout: Execution timeout in seconds (1-300)
             origin: Optional request origin tag
@@ -211,6 +215,7 @@ class FirecrawlClient:
             self.http_client,
             job_id,
             code,
+            prompt=prompt,
             language=language,
             timeout=timeout,
             origin=origin,
@@ -231,8 +236,9 @@ class FirecrawlClient:
     def scrape_execute(
         self,
         job_id: str,
-        code: str,
+        code: Optional[str] = None,
         *,
+        prompt: Optional[str] = None,
         language: Literal["python", "node", "bash"] = "node",
         timeout: Optional[int] = None,
         origin: Optional[str] = None,
@@ -241,6 +247,7 @@ class FirecrawlClient:
         return self.interact(
             job_id,
             code,
+            prompt=prompt,
             language=language,
             timeout=timeout,
             origin=origin,

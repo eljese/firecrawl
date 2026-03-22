@@ -155,10 +155,10 @@ let run = client
     .interact(
         job_id,
         ScrapeExecuteOptions {
-            code: "console.log(await page.url())".to_string(),
+            code: Some("console.log(await page.url())".to_string()),
             language: Some(ScrapeExecuteLanguage::Node),
             timeout: Some(60),
-            origin: None,
+            ..Default::default()
         },
     )
     .await?;

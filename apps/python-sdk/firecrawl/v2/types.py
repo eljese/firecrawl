@@ -845,6 +845,9 @@ class BrowserExecuteResponse(BaseModel):
     """Response from executing code in a browser session."""
 
     success: bool
+    live_view_url: Optional[str] = None
+    interactive_live_view_url: Optional[str] = None
+    output: Optional[str] = None
     stdout: Optional[str] = None
     result: Optional[str] = None
     stderr: Optional[str] = None

@@ -139,8 +139,8 @@ export class FirecrawlClient {
   /**
    * Interact with the browser session associated with a scrape job.
    * @param jobId Scrape job id.
-   * @param args Code to execute with language/timeout options.
-   * @returns Execution result including stdout, stderr, exitCode, and killed status.
+   * @param args Code or prompt to execute, with language/timeout options.
+   * @returns Execution result including output, stdout, stderr, exitCode, and killed status.
    */
   async interact(
     jobId: string,

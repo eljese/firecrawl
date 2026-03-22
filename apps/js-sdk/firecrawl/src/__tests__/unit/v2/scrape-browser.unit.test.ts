@@ -24,6 +24,39 @@ describe("JS SDK v2 scrape-browser methods", () => {
     expect(response.exitCode).toBe(0);
   });
 
+  test("interact with prompt posts prompt to endpoint", async () => {
+    const post = jest.fn(async () => ({
+      status: 200,
+      data: {
+        success: true,
+        output: "Clicked the button",
+        liveViewUrl: "https://live.example.com/view",
+        interactiveLiveViewUrl: "https://live.example.com/interactive",
+        stdout: "",
+        exitCode: 0,
+      },
+    }));
+
+    const http = { post } as any;
+    const response = await interact(http, "job-456", { prompt: "Click the login button" });
+
+    expect(post).toHaveBeenCalledWith("/v2/scrape/job-456/interact", {
+      prompt: "Click the login button",
+      language: "node",
+    });
+    expect(response.success).toBe(true);
+    expect(response.output).toBe("Clicked the button");
+    expect(response.liveViewUrl).toBe("https://live.example.com/view");
+    expect(response.interactiveLiveViewUrl).toBe("https://live.example.com/interactive");
+  });
+
+  test("interact throws when neither code nor prompt provided", async () => {
+    const http = { post: jest.fn() } as any;
+    await expect(interact(http, "job-123", {})).rejects.toThrow(
+      "Either 'code' or 'prompt' must be provided"
+    );
+  });
+
   test("interact throws on non-200 response", async () => {
     const post = jest.fn(async () => ({
       status: 400,

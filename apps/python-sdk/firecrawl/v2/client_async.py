@@ -94,8 +94,9 @@ class AsyncFirecrawlClient:
     async def interact(
         self,
         job_id: str,
-        code: str,
+        code: Optional[str] = None,
         *,
+        prompt: Optional[str] = None,
         language: Literal["python", "node", "bash"] = "node",
         timeout: Optional[int] = None,
         origin: Optional[str] = None,
@@ -104,6 +105,7 @@ class AsyncFirecrawlClient:
             self.async_http_client,
             job_id,
             code,
+            prompt=prompt,
             language=language,
             timeout=timeout,
             origin=origin,
@@ -118,8 +120,9 @@ class AsyncFirecrawlClient:
     async def scrape_execute(
         self,
         job_id: str,
-        code: str,
+        code: Optional[str] = None,
         *,
+        prompt: Optional[str] = None,
         language: Literal["python", "node", "bash"] = "node",
         timeout: Optional[int] = None,
         origin: Optional[str] = None,
@@ -128,6 +131,7 @@ class AsyncFirecrawlClient:
         return await self.interact(
             job_id,
             code,
+            prompt=prompt,
             language=language,
             timeout=timeout,
             origin=origin,

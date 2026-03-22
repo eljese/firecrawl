@@ -711,6 +711,9 @@ export interface BrowserCreateResponse {
 
 export interface BrowserExecuteResponse {
   success: boolean;
+  liveViewUrl?: string;
+  interactiveLiveViewUrl?: string;
+  output?: string;
   stdout?: string;
   result?: string;
   stderr?: string;
@@ -727,7 +730,8 @@ export interface BrowserDeleteResponse {
 }
 
 export interface ScrapeExecuteRequest {
-  code: string;
+  code?: string;
+  prompt?: string;
   language?: "python" | "node" | "bash";
   timeout?: number;
   origin?: string;

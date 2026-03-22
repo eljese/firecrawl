@@ -172,6 +172,37 @@ class TestScrapeRequestPreparation:
         assert response.success is True
         assert response.exit_code == 0
 
+    def test_interact_with_prompt(self):
+        client = _FakeClient(
+            post_response=_FakeResponse(
+                200,
+                {
+                    "success": True,
+                    "output": "Clicked the button",
+                    "liveViewUrl": "https://live.example.com/view",
+                    "interactiveLiveViewUrl": "https://live.example.com/interactive",
+                    "stdout": "",
+                    "exitCode": 0,
+                },
+            ),
+            delete_response=_FakeResponse(200, {"success": True}),
+        )
+        response = interact(
+            client,
+            "job-456",
+            prompt="Click the login button",
+        )
+
+        assert client.last_post[0] == "/v2/scrape/job-456/interact"
+        assert client.last_post[1] == {
+            "language": "node",
+            "prompt": "Click the login button",
+        }
+        assert response.success is True
+        assert response.output == "Clicked the button"
+        assert response.live_view_url == "https://live.example.com/view"
+        assert response.interactive_live_view_url == "https://live.example.com/interactive"
+
     def test_interact_validates_required_inputs(self):
         client = _FakeClient(
             post_response=_FakeResponse(200, {"success": True}),
@@ -179,8 +210,8 @@ class TestScrapeRequestPreparation:
         )
         with pytest.raises(ValueError, match="Job ID cannot be empty"):
             interact(client, "", "console.log('ok')")
-        with pytest.raises(ValueError, match="Code cannot be empty"):
-            interact(client, "job-123", "   ")
+        with pytest.raises(ValueError, match="Either 'code' or 'prompt' must be provided"):
+            interact(client, "job-123")
 
     def test_interact_raises_when_success_false(self):
         client = _FakeClient(

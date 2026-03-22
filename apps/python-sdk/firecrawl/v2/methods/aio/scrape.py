@@ -40,21 +40,27 @@ async def scrape(client: AsyncHttpClient, url: str, options: Optional[ScrapeOpti
 async def interact(
     client: AsyncHttpClient,
     job_id: str,
-    code: str,
+    code: Optional[str] = None,
     *,
+    prompt: Optional[str] = None,
     language: Literal["python", "node", "bash"] = "node",
     timeout: Optional[int] = None,
     origin: Optional[str] = None,
 ) -> BrowserExecuteResponse:
     if not job_id or not job_id.strip():
         raise ValueError("Job ID cannot be empty")
-    if not code or not code.strip():
-        raise ValueError("Code cannot be empty")
+    has_code = code and code.strip()
+    has_prompt = prompt and prompt.strip()
+    if not has_code and not has_prompt:
+        raise ValueError("Either 'code' or 'prompt' must be provided")
 
     payload: Dict[str, Any] = {
-        "code": code,
         "language": language,
     }
+    if has_code:
+        payload["code"] = code
+    if has_prompt:
+        payload["prompt"] = prompt
     if timeout is not None:
         payload["timeout"] = timeout
     if origin is not None:
@@ -71,6 +77,10 @@ async def interact(
     normalized = dict(body)
     if "exitCode" in normalized and "exit_code" not in normalized:
         normalized["exit_code"] = normalized["exitCode"]
+    if "liveViewUrl" in normalized and "live_view_url" not in normalized:
+        normalized["live_view_url"] = normalized["liveViewUrl"]
+    if "interactiveLiveViewUrl" in normalized and "interactive_live_view_url" not in normalized:
+        normalized["interactive_live_view_url"] = normalized["interactiveLiveViewUrl"]
     return BrowserExecuteResponse(**normalized)
 
 
@@ -98,8 +108,9 @@ async def stop_interactive_browser(
 async def scrape_execute(
     client: AsyncHttpClient,
     job_id: str,
-    code: str,
+    code: Optional[str] = None,
     *,
+    prompt: Optional[str] = None,
     language: Literal["python", "node", "bash"] = "node",
     timeout: Optional[int] = None,
     origin: Optional[str] = None,
@@ -109,6 +120,7 @@ async def scrape_execute(
         client,
         job_id,
         code,
+        prompt=prompt,
         language=language,
         timeout=timeout,
         origin=origin,

@@ -72,8 +72,9 @@ def scrape(client: HttpClient, url: str, options: Optional[ScrapeOptions] = None
 def interact(
     client: HttpClient,
     job_id: str,
-    code: str,
+    code: Optional[str] = None,
     *,
+    prompt: Optional[str] = None,
     language: Literal["python", "node", "bash"] = "node",
     timeout: Optional[int] = None,
     origin: Optional[str] = None,
@@ -81,10 +82,15 @@ def interact(
     """
     Interact with the scrape-bound browser session for a scrape job.
 
+    Either ``code`` or ``prompt`` must be provided.  When ``prompt`` is given
+    the server runs an AI agent that translates the natural-language instruction
+    into browser actions.
+
     Args:
         client: HTTP client instance
         job_id: Scrape job ID
-        code: Code to execute
+        code: Code to execute (optional if prompt is provided)
+        prompt: Natural-language instruction for the browser agent (optional if code is provided)
         language: Programming language ("python", "node", or "bash")
         timeout: Execution timeout in seconds (1-300)
         origin: Optional request origin tag
@@ -94,13 +100,18 @@ def interact(
     """
     if not job_id or not job_id.strip():
         raise ValueError("Job ID cannot be empty")
-    if not code or not code.strip():
-        raise ValueError("Code cannot be empty")
+    has_code = code and code.strip()
+    has_prompt = prompt and prompt.strip()
+    if not has_code and not has_prompt:
+        raise ValueError("Either 'code' or 'prompt' must be provided")
 
     body: Dict[str, Any] = {
-        "code": code,
         "language": language,
     }
+    if has_code:
+        body["code"] = code
+    if has_prompt:
+        body["prompt"] = prompt
     if timeout is not None:
         body["timeout"] = timeout
     if origin is not None:
@@ -117,6 +128,10 @@ def interact(
     normalized = dict(payload)
     if "exitCode" in normalized and "exit_code" not in normalized:
         normalized["exit_code"] = normalized["exitCode"]
+    if "liveViewUrl" in normalized and "live_view_url" not in normalized:
+        normalized["live_view_url"] = normalized["liveViewUrl"]
+    if "interactiveLiveViewUrl" in normalized and "interactive_live_view_url" not in normalized:
+        normalized["interactive_live_view_url"] = normalized["interactiveLiveViewUrl"]
     return BrowserExecuteResponse(**normalized)
 
 
@@ -154,8 +169,9 @@ def stop_interactive_browser(
 def scrape_execute(
     client: HttpClient,
     job_id: str,
-    code: str,
+    code: Optional[str] = None,
     *,
+    prompt: Optional[str] = None,
     language: Literal["python", "node", "bash"] = "node",
     timeout: Optional[int] = None,
     origin: Optional[str] = None,
@@ -165,6 +181,7 @@ def scrape_execute(
         client,
         job_id,
         code,
+        prompt=prompt,
         language=language,
         timeout=timeout,
         origin=origin,
