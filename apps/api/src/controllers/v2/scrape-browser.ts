@@ -31,7 +31,7 @@ import {
   executePromptViaBrowserAgent,
   AgentResult,
 } from "../../lib/scrape-interact/browser-agent";
-import { RequestWithAuth } from "./types";
+import { RequestWithAuth, ScrapeOptions } from "./types";
 import { billTeam } from "../../services/billing/credit_billing";
 import { enqueueBrowserSessionActivity } from "../../lib/browser-session-activity";
 import { logRequest } from "../../services/logging/log_job";
@@ -162,6 +162,7 @@ export async function scrapeInteractController(
       scrapeId,
       replayContext,
       logger,
+      (scrape.options as ScrapeOptions).profile,
     );
     if ("error" in created) {
       return res.status(created.status).json(created.body);
@@ -384,13 +385,15 @@ async function createSessionForScrape(
     ? NonNullable<C>
     : never,
   logger: typeof _logger,
+  profile: { name: string; saveChanges: boolean } | undefined,
 ): Promise<
   | { session: Awaited<ReturnType<typeof insertBrowserSession>> }
   | { status: number; body: { success: false; error: string }; error: true }
 > {
   const sessionId = uuidv7();
-  const { ttl, activityTtl, streamWebView, profile } =
-    browserCreateRequestSchema.parse({});
+  const { ttl, activityTtl, streamWebView } = browserCreateRequestSchema.parse(
+    {},
+  );
   const integration = req.body?.integration ?? null;
 
   if (!config.BROWSER_SERVICE_URL) {
