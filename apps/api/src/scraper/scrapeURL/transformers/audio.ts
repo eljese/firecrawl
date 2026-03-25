@@ -2,7 +2,7 @@ import { Meta } from "..";
 import { Document } from "../../../controllers/v2/types";
 import { config } from "../../../config";
 import { hasFormatOfType } from "../../../lib/format-utils";
-import { TransportableError } from "../../../lib/error";
+import { AudioUnsupportedUrlError } from "../error";
 
 let cachedUrlRegex: RegExp | null = null;
 let cacheTimestamp = 0;
@@ -48,10 +48,7 @@ export async function fetchAudio(
 
   const urlRegex = await getSupportedUrlRegex();
   if (!urlRegex.test(meta.url)) {
-    throw new TransportableError(
-      "SCRAPE_AUDIO_UNSUPPORTED_URL",
-      "The audio format does not support the provided URL",
-    );
+    throw new AudioUnsupportedUrlError();
   }
 
   const response = await fetch(`${config.AVGRAB_SERVICE_URL}/download`, {
