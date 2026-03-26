@@ -82,7 +82,7 @@ export async function searchController(
 
     logger = logger.child({
       version: "v2",
-      query: req.body.query,
+      query: req.body.query ?? req.body.queries?.join(" | "),
       origin: req.body.origin,
     });
 

@@ -1,5 +1,5 @@
 import type { Logger } from "winston";
-import { WebSearchResult, SearchV2Response } from "../lib/entities";
+import { type WebSearchResult, SearchV2Response } from "../lib/entities";
 import { ScrapeOptions } from "../controllers/v2/types";
 import {
   getItemsToScrape,
