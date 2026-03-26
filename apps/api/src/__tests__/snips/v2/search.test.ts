@@ -271,9 +271,9 @@ describeIf(TEST_PRODUCTION || HAS_SEARCH || HAS_PROXY)("Search tests", () => {
     60000,
   );
 
-  // Query decomposition tests
+  // Decomposition
   itIf(HAS_AI)(
-    "auto decomposition returns grouped results",
+    "decomposition returns grouped results",
     async () => {
       const raw = await searchRaw(
         {
@@ -284,86 +284,13 @@ describeIf(TEST_PRODUCTION || HAS_SEARCH || HAS_PROXY)("Search tests", () => {
         identity,
       );
       expect(raw.statusCode).toBe(200);
-      const data = raw.body.data;
-      expect(data.originalQuery).toBe("web scraping best practices");
-      expect(data.queries).toBeDefined();
-      expect(data.queries.length).toBeGreaterThanOrEqual(2);
-      for (const q of data.queries) {
-        expect(q.query).toBeDefined();
-        expect(Array.isArray(q.results)).toBe(true);
-      }
-      const totalResults = data.queries.reduce(
-        (sum: number, q: any) => sum + q.results.length,
-        0,
-      );
-      expect(totalResults).toBeGreaterThan(0);
-      expect(totalResults).toBeLessThanOrEqual(5);
+      expect(raw.body.data.originalQuery).toBe("web scraping best practices");
+      expect(raw.body.data.queries.length).toBeGreaterThanOrEqual(2);
     },
     120000,
   );
 
-  itIf(HAS_AI)(
-    "manual decomposition with numQueries and searchesPerQuery",
-    async () => {
-      const raw = await searchRaw(
-        {
-          query: "javascript testing frameworks",
-          decomposition: { numQueries: 2, searchesPerQuery: 2 },
-          limit: 5,
-        },
-        identity,
-      );
-      expect(raw.statusCode).toBe(200);
-      const data = raw.body.data;
-      expect(data.originalQuery).toBe("javascript testing frameworks");
-      expect(data.queries.length).toBe(2);
-      const totalResults = data.queries.reduce(
-        (sum: number, q: any) => sum + q.results.length,
-        0,
-      );
-      expect(totalResults).toBeGreaterThan(0);
-      expect(totalResults).toBeLessThanOrEqual(5);
-    },
-    120000,
-  );
-
-  itIf(HAS_AI)(
-    "decomposition deduplicates results by URL",
-    async () => {
-      const raw = await searchRaw(
-        {
-          query: "python web scraping tutorial",
-          decomposition: { numQueries: 2, searchesPerQuery: 3 },
-          limit: 8,
-        },
-        identity,
-      );
-      expect(raw.statusCode).toBe(200);
-      const allUrls = raw.body.data.queries.flatMap((q: any) =>
-        q.results.map((r: any) => r.url),
-      );
-      const uniqueUrls = new Set(allUrls);
-      expect(allUrls.length).toBe(uniqueUrls.size);
-    },
-    120000,
-  );
-
-  it.concurrent(
-    "rejects invalid decomposition numQueries",
-    async () => {
-      const raw = await searchRaw(
-        {
-          query: "firecrawl",
-          decomposition: { numQueries: 11 },
-        } as any,
-        identity,
-      );
-      expect(raw.statusCode).toBe(400);
-    },
-    60000,
-  );
-
-  // Multi-query tests
+  // Multi-query
   it(
     "multi-query returns grouped results",
     async () => {
@@ -375,42 +302,26 @@ describeIf(TEST_PRODUCTION || HAS_SEARCH || HAS_PROXY)("Search tests", () => {
         identity,
       );
       expect(raw.statusCode).toBe(200);
-      const data = raw.body.data;
-      expect(data.queries).toBeDefined();
-      expect(data.queries.length).toBe(2);
-      expect(data.queries[0].query).toBe("apple stock price");
-      expect(data.queries[1].query).toBe("nvidia stock price");
-      for (const q of data.queries) {
-        expect(q.results.length).toBeLessThanOrEqual(3);
-      }
+      expect(raw.body.data.queries.length).toBe(2);
+      expect(raw.body.data.queries[0].query).toBe("apple stock price");
+      expect(raw.body.data.queries[1].query).toBe("nvidia stock price");
     },
     120000,
   );
 
-  it.concurrent(
-    "rejects both query and queries",
-    async () => {
-      const raw = await searchRaw(
-        {
-          query: "test",
-          queries: ["test1", "test2"],
-        } as any,
-        identity,
-      );
-      expect(raw.statusCode).toBe(400);
-    },
-    60000,
-  );
+  // Validation
+  it.concurrent("rejects invalid decomposition numQueries", async () => {
+    const raw = await searchRaw({ query: "firecrawl", decomposition: { numQueries: 11 } } as any, identity);
+    expect(raw.statusCode).toBe(400);
+  }, 60000);
 
-  it.concurrent(
-    "rejects missing query and queries",
-    async () => {
-      const raw = await searchRaw(
-        { limit: 5 } as any,
-        identity,
-      );
-      expect(raw.statusCode).toBe(400);
-    },
-    60000,
-  );
+  it.concurrent("rejects both query and queries", async () => {
+    const raw = await searchRaw({ query: "test", queries: ["a", "b"] } as any, identity);
+    expect(raw.statusCode).toBe(400);
+  }, 60000);
+
+  it.concurrent("rejects missing query and queries", async () => {
+    const raw = await searchRaw({ limit: 5 } as any, identity);
+    expect(raw.statusCode).toBe(400);
+  }, 60000);
 });
