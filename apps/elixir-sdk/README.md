@@ -11,7 +11,7 @@ Add `firecrawl` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:firecrawl, "~> 0.1.0"}
+    {:firecrawl, "~> 1.0"}
   ]
 end
 ```
@@ -86,7 +86,10 @@ This will:
 
 1. Fetch the latest OpenAPI JSON from GitHub
 2. Generate all API wrapper functions in `lib/firecrawl.ex`
-3. Bump the patch version in `mix.exs` (only if the generated code changed)
+3. Bump the version in `mix.exs` using semver (only if the generated code changed):
+   - **Major** bump if public functions were removed (breaking change)
+   - **Minor** bump if new public functions were added
+   - **Patch** bump for any other changes (signatures, docs, etc.)
 
 Re-running when nothing changed is a no-op — the version is not bumped.
 
