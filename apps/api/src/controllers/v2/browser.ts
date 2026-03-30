@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
 import { Request, Response } from "express";
 import { z } from "zod";
@@ -228,14 +229,11 @@ export async function browserCreateController(
     });
   }
 
-  if (profile) {
-    return res.status(501).json({
-      success: false,
-      error: "Browser profiles are not yet supported. This feature is coming soon.",
-    });
-  }
-
-  logger.info("Creating browser session", { ttl, activityTtl });
+  logger.info("Creating browser session", {
+    ttl,
+    activityTtl,
+    profile: profile?.name,
+  });
 
   // 0a. Check if team has enough credits for the full TTL
   const estimatedCredits = calculateBrowserSessionCredits(ttl * 1000);
@@ -274,18 +272,38 @@ export async function browserCreateController(
 
   for (let attempt = 1; attempt <= MAX_CREATE_RETRIES; attempt++) {
     try {
+      const createPayload: Record<string, unknown> = {
+        mode: "sandbox",
+        ttl_seconds: ttl,
+        activity_ttl_seconds: activityTtl ?? 0,
+        customer_id: req.auth.team_id,
+      };
+
+      if (profile) {
+        const teamHash = createHash("sha256")
+          .update(req.auth.team_id)
+          .digest("hex")
+          .slice(0, 16);
+        createPayload.persistent_storage = {
+          unique_id: `${teamHash}_${profile.name}`,
+          write: profile.saveChanges,
+        };
+      }
+
       svcResponse = await browserServiceRequest<BrowserServiceCreateResponse>(
         "POST",
         "/v1/sessions",
-        {
-          mode: "sandbox",
-          ttl_seconds: ttl,
-          activity_ttl_seconds: activityTtl ?? 0,
-          customer_id: req.auth.team_id,
-        },
+        createPayload,
       );
       break;
     } catch (err) {
+      if (err instanceof BrowserServiceError && err.status === 409) {
+        return res.status(409).json({
+          success: false,
+          error:
+            "Another session is currently writing to this profile. Only one writer is allowed at a time. You can still access it with saveChanges: false, or try again later.",
+        });
+      }
       lastCreateError = err;
       logger.warn("Browser session creation attempt failed", {
         attempt,

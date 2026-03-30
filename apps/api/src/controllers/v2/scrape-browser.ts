@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { v7 as uuidv7 } from "uuid";
 import { Response } from "express";
 import { z } from "zod";
@@ -23,6 +24,7 @@ import {
 } from "../../lib/concurrency-limit";
 import {
   browserServiceRequest,
+  BrowserServiceError,
   BrowserServiceExecResponse,
   BrowserServiceCreateResponse,
   BrowserServiceDeleteResponse,
@@ -184,6 +186,7 @@ export async function scrapeInteractController(
       scrapeId,
       replayContext,
       logger,
+      (scrape.options as ScrapeOptions).profile,
     );
     if ("error" in created) {
       return res.status(created.status).json(created.body);
@@ -348,11 +351,14 @@ export async function scrapeStopInteractiveBrowserController(
 
   invalidateActiveBrowserSessionCount(session.team_id).catch(() => {});
   removeConcurrencyLimitActiveJob(session.team_id, session.id).catch(error => {
-    logger.error("Failed to remove concurrency limiter entry for browser session", {
-      error,
-      sessionId: session.id,
-      teamId: session.team_id,
-    });
+    logger.error(
+      "Failed to remove concurrency limiter entry for browser session",
+      {
+        error,
+        sessionId: session.id,
+        teamId: session.team_id,
+      },
+    );
   });
 
   if (!claimed) {
@@ -421,6 +427,7 @@ async function createSessionForScrape(
     ? NonNullable<C>
     : never,
   logger: typeof _logger,
+  profile: { name: string; saveChanges: boolean } | undefined,
 ): Promise<
   | { session: Awaited<ReturnType<typeof insertBrowserSession>> }
   | { status: number; body: { success: false; error: string }; error: true }
@@ -485,18 +492,42 @@ async function createSessionForScrape(
 
   for (let attempt = 1; attempt <= MAX_CREATE_RETRIES; attempt++) {
     try {
+      const createPayload: Record<string, unknown> = {
+        mode: "sandbox",
+        ttl_seconds: ttl,
+        activity_ttl_seconds: activityTtl ?? 0,
+        customer_id: req.auth.team_id,
+      };
+
+      if (profile) {
+        const teamHash = createHash("sha256")
+          .update(req.auth.team_id)
+          .digest("hex")
+          .slice(0, 16);
+        createPayload.persistent_storage = {
+          unique_id: `${teamHash}_${profile.name}`,
+          write: profile.saveChanges !== false,
+        };
+      }
+
       svcResponse = await browserServiceRequest<BrowserServiceCreateResponse>(
         "POST",
         "/v1/sessions",
-        {
-          mode: "sandbox",
-          ttl_seconds: ttl,
-          activity_ttl_seconds: activityTtl ?? 0,
-          customer_id: req.auth.team_id,
-        },
+        createPayload,
       );
       break;
     } catch (err) {
+      if (err instanceof BrowserServiceError && err.status === 409) {
+        return {
+          status: 409,
+          body: {
+            success: false,
+            error:
+              "Another session is currently writing to this profile. Only one writer is allowed at a time. You can still access it with saveChanges: false, or try again later.",
+          },
+          error: true,
+        };
+      }
       lastCreateError = err;
       logger.warn("Browser session creation attempt failed", {
         attempt,
@@ -545,25 +576,21 @@ async function createSessionForScrape(
     // Ensure only one tab exists with the content page in the foreground.
     // The replay may have created extra tabs. Find the one with content,
     // close everything else, update the REPL's page var, and bring to front.
-    await browserServiceRequest(
-      "POST",
-      `/v1/sessions/${svcResponse.id}/exec`,
-      {
-        code: [
-          `const ctx = page.context();`,
-          `const pages = ctx.pages();`,
-          `if (pages.length > 1) {`,
-          `  const target = pages.find(p => { const u = p.url(); return u && u !== 'about:blank'; }) || pages[pages.length - 1];`,
-          `  for (const p of pages) { if (p !== target) await p.close().catch(() => {}); }`,
-          `  page = target;`,
-          `}`,
-          `await page.bringToFront();`,
-        ].join("\n"),
-        language: "node",
-        timeout: 10,
-        origin: "tab_sync",
-      },
-    ).catch(() => {});
+    await browserServiceRequest("POST", `/v1/sessions/${svcResponse.id}/exec`, {
+      code: [
+        `const ctx = page.context();`,
+        `const pages = ctx.pages();`,
+        `if (pages.length > 1) {`,
+        `  const target = pages.find(p => { const u = p.url(); return u && u !== 'about:blank'; }) || pages[pages.length - 1];`,
+        `  for (const p of pages) { if (p !== target) await p.close().catch(() => {}); }`,
+        `  page = target;`,
+        `}`,
+        `await page.bringToFront();`,
+      ].join("\n"),
+      language: "node",
+      timeout: 10,
+      origin: "tab_sync",
+    }).catch(() => {});
 
     // Sync agent-browser to the correct page
     const syncResult = await browserServiceRequest<BrowserServiceExecResponse>(
