@@ -36,7 +36,7 @@ import {
 } from "./shared";
 import { queueStatusController } from "../controllers/v1/queue-status";
 import { creditUsageHistoricalController } from "../controllers/v1/credit-usage-historical";
-import { activityController } from "../controllers/v1/activity";
+
 import { tokenUsageHistoricalController } from "../controllers/v1/token-usage-historical";
 import {
   paymentMiddleware,
@@ -310,12 +310,6 @@ v1Router.get(
   "/team/queue-status",
   authMiddleware(RateLimiterMode.Account),
   wrap(queueStatusController),
-);
-
-v1Router.get(
-  "/activity",
-  authMiddleware(RateLimiterMode.Account),
-  wrap(activityController),
 );
 
 // Only register x402 routes if X402_PAY_TO_ADDRESS is configured

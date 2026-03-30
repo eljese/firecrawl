@@ -50,6 +50,7 @@ import {
   browserListController,
   browserWebhookDestroyedController,
 } from "../controllers/v2/browser";
+import { activityController } from "../controllers/v1/activity";
 import { agentSignupController } from "../controllers/v2/agent-signup";
 import {
   agentSignupConfirmController,
@@ -375,6 +376,12 @@ v2Router.get(
   "/team/queue-status",
   authMiddleware(RateLimiterMode.CrawlStatus),
   wrap(queueStatusController),
+);
+
+v2Router.get(
+  "/team/activity",
+  authMiddleware(RateLimiterMode.Account),
+  wrap(activityController),
 );
 
 v2Router.post(
