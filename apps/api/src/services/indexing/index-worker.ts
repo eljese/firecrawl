@@ -90,8 +90,7 @@ const processBillingJobInternal = async (token: string, job: Job) => {
         is_extract,
         api_key_id,
         autumnTrackInRequest,
-      } =
-        job.data;
+      } = job.data;
 
       logger.info(`Adding team ${team_id} billing operation to batch queue`, {
         credits,
@@ -682,7 +681,7 @@ async function tallyBilling() {
   for (const teamId of billedTeams) {
     logger.info("Updating tally for team", { teamId });
 
-    const { error } = await supabase_service.rpc("update_tally_10_team", {
+    const { error } = await supabase_service.rpc("update_tally_11_team", {
       i_team_id: teamId,
     });
 
