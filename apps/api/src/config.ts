@@ -90,8 +90,8 @@ const configSchema = z.object({
   GCS_MEDIA_BUCKET_NAME: z.string().optional(),
 
   // ClickHouse (Search Analytics)
-  CLICKHOUSE_SEARCH_ANALYTICS_URL: z.string().optional(),
-  CLICKHOUSE_SEARCH_ANALYTICS_DATABASE: z.string().optional(),
+  CLICKHOUSE_ANALYTICS_URL: z.string().optional(),
+  CLICKHOUSE_ANALYTICS_DATABASE: z.string().optional(),
 
   // Fire Engine
   FIRE_ENGINE_BETA_URL: z.string().optional(),

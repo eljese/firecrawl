@@ -2,10 +2,10 @@ import { createClient } from "@clickhouse/client";
 import { config } from "../config";
 import { logger } from "./logger";
 
-const client = config.CLICKHOUSE_SEARCH_ANALYTICS_URL
+const client = config.CLICKHOUSE_ANALYTICS_URL
   ? createClient({
-      url: config.CLICKHOUSE_SEARCH_ANALYTICS_URL,
-      database: config.CLICKHOUSE_SEARCH_ANALYTICS_DATABASE ?? "default",
+      url: config.CLICKHOUSE_ANALYTICS_URL,
+      database: config.CLICKHOUSE_ANALYTICS_DATABASE ?? "default",
       clickhouse_settings: {
         async_insert: 1,
         wait_for_async_insert: 0,
