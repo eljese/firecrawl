@@ -159,7 +159,7 @@ export async function scrapePDFWithFirePDF(
     html: await marked.parse(resp.markdown, { async: true }),
   };
 
-  if (!meta.internalOptions.zeroDataRetention) {
+  if (!maxPages && !meta.internalOptions.zeroDataRetention) {
     try {
       await savePdfResultToCache(base64Content, processorResult, "firepdf");
     } catch (error) {
