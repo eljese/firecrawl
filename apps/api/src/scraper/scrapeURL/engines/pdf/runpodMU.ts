@@ -186,9 +186,16 @@ export async function scrapePDFWithRunPodMU(
     throw new Error("RunPod MU returned no result");
   }
 
+  let html: string;
+  try {
+    html = await marked.parse(result.markdown, { async: true });
+  } catch {
+    html = `<pre>${result.markdown}</pre>`;
+  }
+
   const processorResult = {
     markdown: result.markdown,
-    html: await marked.parse(result.markdown, { async: true }),
+    html,
   };
 
   if (!meta.internalOptions.zeroDataRetention) {

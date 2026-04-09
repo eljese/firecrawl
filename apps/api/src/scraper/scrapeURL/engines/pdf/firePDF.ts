@@ -76,9 +76,18 @@ export async function scrapePDFWithFirePDF(
     perPageMs: pages ? Math.round(durationMs / pages) : undefined,
   });
 
+  let html: string;
+  try {
+    html = await marked.parse(resp.markdown, { async: true });
+  } catch {
+    // marked.js can blow the stack on very large/complex markdown.
+    // Fall back to wrapping raw markdown in a <pre> block.
+    html = `<pre>${resp.markdown}</pre>`;
+  }
+
   const processorResult = {
     markdown: resp.markdown,
-    html: await marked.parse(resp.markdown, { async: true }),
+    html,
   };
 
   if (!maxPages && !meta.internalOptions.zeroDataRetention) {
