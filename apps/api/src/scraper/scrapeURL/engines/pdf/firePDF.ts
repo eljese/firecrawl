@@ -79,10 +79,13 @@ export async function scrapePDFWithFirePDF(
   let html: string;
   try {
     html = await marked.parse(resp.markdown, { async: true });
-  } catch {
-    // marked.js can blow the stack on very large/complex markdown.
-    // Fall back to wrapping raw markdown in a <pre> block.
-    html = `<pre>${resp.markdown}</pre>`;
+  } catch (e) {
+    logger.warn("marked.parse failed, falling back to <pre> wrapper", {
+      error: e,
+      scrapeId: meta.id,
+      markdownLength: resp.markdown.length,
+    });
+    html = `<pre>${resp.markdown.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
   }
 
   const processorResult = {

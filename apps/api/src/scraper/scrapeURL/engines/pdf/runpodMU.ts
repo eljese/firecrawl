@@ -189,8 +189,13 @@ export async function scrapePDFWithRunPodMU(
   let html: string;
   try {
     html = await marked.parse(result.markdown, { async: true });
-  } catch {
-    html = `<pre>${result.markdown}</pre>`;
+  } catch (e) {
+    meta.logger.warn("marked.parse failed, falling back to <pre> wrapper", {
+      error: e,
+      scrapeId: meta.id,
+      markdownLength: result.markdown.length,
+    });
+    html = `<pre>${result.markdown.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
   }
 
   const processorResult = {
