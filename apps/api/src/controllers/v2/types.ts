@@ -1673,7 +1673,7 @@ export const searchRequestSchema = z
       .optional()
       .refine(
         val =>
-          !val ||
+          val === undefined ||
           Object.keys(countries).includes(val.toUpperCase()) ||
           SPECIAL_COUNTRIES.includes(val.toLowerCase()),
         "Invalid country code. Use a valid ISO 3166-1 alpha-2 country code.",

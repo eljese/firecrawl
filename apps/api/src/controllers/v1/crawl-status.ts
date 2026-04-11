@@ -179,16 +179,20 @@ export async function crawlStatusController(
   }
 
   const parsedSkip =
-    typeof req.query.skip === "string" ? parseInt(req.query.skip, 10) : 0;
+    typeof req.query.skip === "string" ? Number(req.query.skip) : 0;
   const parsedLimit =
-    typeof req.query.limit === "string"
-      ? parseInt(req.query.limit, 10)
-      : undefined;
+    typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
 
-  if (isNaN(parsedSkip) || (parsedLimit !== undefined && isNaN(parsedLimit))) {
+  if (
+    !Number.isInteger(parsedSkip) ||
+    parsedSkip < 0 ||
+    (parsedLimit !== undefined &&
+      (!Number.isInteger(parsedLimit) || parsedLimit <= 0))
+  ) {
     return res.status(400).json({
       success: false,
-      error: "Invalid query parameters: skip and limit must be numeric values",
+      error:
+        "Invalid query parameters: skip must be a non-negative integer and limit must be a positive integer",
     });
   }
 
