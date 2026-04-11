@@ -3,7 +3,6 @@ import { logger } from "./logger";
 import { config } from "../config";
 import crypto from "crypto";
 import { storage } from "./gcs-jobs";
-import { gzipSync, gunzipSync } from "zlib";
 
 type PdfCacheProvider = "runpod" | "firepdf";
 
@@ -29,16 +28,14 @@ export async function savePdfResultToCache(
     const prefix = PROVIDER_PREFIXES[provider];
     const cacheKey = createPdfCacheKey(pdfContent);
     const bucket = storage.bucket(config.GCS_BUCKET_NAME);
-    const blob = bucket.file(`${prefix}${cacheKey}.json.gz`);
-    const compressed = gzipSync(JSON.stringify(result));
+    const blob = bucket.file(`${prefix}${cacheKey}.json`);
 
     for (let i = 0; i < 3; i++) {
       try {
-        await blob.save(compressed, {
+        await blob.save(JSON.stringify(result), {
           contentType: "application/json",
-          gzip: false,
+          gzip: true,
           metadata: {
-            contentEncoding: "gzip",
             source: `${provider}_pdf_conversion`,
             cache_type: "pdf_markdown",
             created_at: new Date().toISOString(),
@@ -87,27 +84,10 @@ export async function getPdfResultFromCache(
     const prefix = PROVIDER_PREFIXES[provider];
     const cacheKey = createPdfCacheKey(pdfContent);
     const bucket = storage.bucket(config.GCS_BUCKET_NAME);
+    const blob = bucket.file(`${prefix}${cacheKey}.json`);
 
-    let result: { markdown: string; html: string };
-
-    // Try gzipped cache entry first, fall back to uncompressed
-    const gzBlob = bucket.file(`${prefix}${cacheKey}.json.gz`);
-    try {
-      const [compressed] = await gzBlob.download();
-      result = JSON.parse(gunzipSync(compressed).toString());
-    } catch (gzError) {
-      if (
-        gzError instanceof ApiError &&
-        gzError.code === 404 &&
-        gzError.message.includes("No such object:")
-      ) {
-        const blob = bucket.file(`${prefix}${cacheKey}.json`);
-        const [content] = await blob.download();
-        result = JSON.parse(content.toString());
-      } else {
-        throw gzError;
-      }
-    }
+    const [content] = await blob.download();
+    const result = JSON.parse(content.toString());
 
     logger.info(`Retrieved PDF result from GCS cache`, {
       cacheKey,
