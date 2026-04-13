@@ -19,11 +19,39 @@ export type InteractTraceMetadata = {
   browser_id?: string;
   run_id?: string;
   mode: "prompt" | "code";
+  // Context inherited from the upstream scrape that this interact session is
+  // continuing. Interact extends scrape, so the agent's work only makes sense
+  // alongside what the scrape set up: the target URL, how long it waited,
+  // what pre-actions ran, and where the scrape was initiated. URLs are
+  // normalized to origin+path (no query string) before being attached to
+  // avoid leaking query-string PII into LangSmith.
+  scrape_url?: string;
+  target_url?: string;
+  scrape_wait_for_ms?: number;
+  scrape_actions?: number;
+  scrape_origin?: string;
   // When true, the caller has determined the team/scrape is under
   // zero-data-retention and tracing must be skipped entirely so no prompt,
   // code, or tool I/O is shipped to LangSmith.
   zeroDataRetention?: boolean;
 };
+
+/**
+ * Strip query string + fragment from a URL so it can safely go into trace
+ * metadata. Returns origin + pathname only. Falls back to the raw string if
+ * URL parsing fails, which is acceptable since the metadata is best-effort.
+ */
+export function sanitizeUrlForTrace(
+  url: string | null | undefined,
+): string | undefined {
+  if (!url) return undefined;
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname}`;
+  } catch {
+    return url;
+  }
+}
 
 type WrappedAISDK = {
   generateText: typeof ai.generateText;

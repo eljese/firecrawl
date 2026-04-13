@@ -1,37 +1,47 @@
 /**
- * Sanity tests for the LangSmith wiring. These don't hit the LangSmith API —
- * they only verify the gating and passthrough semantics so the module is safe
- * to import in environments without a LANGSMITH_API_KEY set.
+ * Sanity tests for the LangSmith wiring. The disabled-path block isolates
+ * modules and strips LANGSMITH_* env vars so the tests don't depend on the
+ * developer's local .env, where LANGSMITH_API_KEY may or may not be set.
  */
 import * as ai from "ai";
-import {
-  generateText,
-  streamText,
-  generateObject,
-  streamObject,
-  isLangSmithEnabled,
-  buildLangSmithProviderOptions,
-  traceInteract,
-} from "./langsmith";
 
 describe("scrape-interact/langsmith (disabled — no API key)", () => {
-  // These tests run in the normal test environment, where LANGSMITH_API_KEY is
-  // not set. That means isLangSmithEnabled should be false and the module
-  // should fall back cleanly to the raw ai SDK.
+  beforeEach(() => {
+    jest.resetModules();
+    // Mock config to ensure LANGSMITH_API_KEY is unset regardless of what's
+    // in the developer's local .env file — this keeps the disabled-path
+    // tests hermetic.
+    jest.doMock("../../config", () => ({
+      config: {
+        LANGSMITH_API_KEY: undefined,
+        LANGSMITH_TRACING: undefined,
+        LANGSMITH_PROJECT: undefined,
+        LANGSMITH_ENDPOINT: undefined,
+      },
+    }));
+  });
+
+  afterEach(() => {
+    jest.dontMock("../../config");
+  });
 
   it("reports disabled when LANGSMITH_API_KEY is unset", () => {
-    expect(isLangSmithEnabled).toBe(false);
+    const mod = require("./langsmith");
+    expect(mod.isLangSmithEnabled).toBe(false);
   });
 
   it("re-exports raw ai SDK functions when disabled", () => {
-    expect(generateText).toBe(ai.generateText);
-    expect(streamText).toBe(ai.streamText);
-    expect(generateObject).toBe(ai.generateObject);
-    expect(streamObject).toBe(ai.streamObject);
+    const freshAi = require("ai");
+    const mod = require("./langsmith");
+    expect(mod.generateText).toBe(freshAi.generateText);
+    expect(mod.streamText).toBe(freshAi.streamText);
+    expect(mod.generateObject).toBe(freshAi.generateObject);
+    expect(mod.streamObject).toBe(freshAi.streamObject);
   });
 
   it("returns undefined providerOptions when disabled", () => {
-    const opts = buildLangSmithProviderOptions(
+    const mod = require("./langsmith");
+    const opts = mod.buildLangSmithProviderOptions(
       {
         thread_id: "t1",
         session_id: "t1",
@@ -45,8 +55,9 @@ describe("scrape-interact/langsmith (disabled — no API key)", () => {
   });
 
   it("traceInteract returns the original function unchanged when disabled", async () => {
+    const mod = require("./langsmith");
     const original = async (x: number) => x * 2;
-    const wrapped = traceInteract(
+    const wrapped = mod.traceInteract(
       original,
       {
         thread_id: "t1",
@@ -59,6 +70,20 @@ describe("scrape-interact/langsmith (disabled — no API key)", () => {
     );
     expect(wrapped).toBe(original);
     await expect(wrapped(3)).resolves.toBe(6);
+  });
+
+  it("sanitizeUrlForTrace strips query strings and fragments", () => {
+    const { sanitizeUrlForTrace } = require("./langsmith");
+    expect(sanitizeUrlForTrace("https://example.com/page?token=abc#x")).toBe(
+      "https://example.com/page",
+    );
+    expect(sanitizeUrlForTrace("https://example.com/")).toBe(
+      "https://example.com/",
+    );
+    expect(sanitizeUrlForTrace(null)).toBeUndefined();
+    expect(sanitizeUrlForTrace(undefined)).toBeUndefined();
+    // Invalid URL → returned as-is, not thrown
+    expect(sanitizeUrlForTrace("not a url")).toBe("not a url");
   });
 });
 
@@ -115,7 +140,7 @@ describe("scrape-interact/langsmith (enabled — mocked SDK)", () => {
     expect(mod.generateText).not.toBe(ai.generateText);
   });
 
-  it("builds provider options with thread_id + scrape_id metadata", () => {
+  it("builds provider options with thread_id + scrape context metadata", () => {
     const mod = require("./langsmith");
     const result = mod.buildLangSmithProviderOptions(
       {
@@ -125,6 +150,11 @@ describe("scrape-interact/langsmith (enabled — mocked SDK)", () => {
         team_id: "team-42",
         browser_id: "browser-1",
         mode: "prompt",
+        scrape_url: "https://example.com/pricing",
+        target_url: "https://example.com/pricing/",
+        scrape_wait_for_ms: 500,
+        scrape_actions: 2,
+        scrape_origin: "api",
       },
       { name: "interact:prompt", extra: { prompt_length: 123 } },
     );
@@ -141,6 +171,11 @@ describe("scrape-interact/langsmith (enabled — mocked SDK)", () => {
       session_id: "sess-abc",
       scrape_id: "scrape-xyz",
       team_id: "team-42",
+      scrape_url: "https://example.com/pricing",
+      target_url: "https://example.com/pricing/",
+      scrape_wait_for_ms: 500,
+      scrape_actions: 2,
+      scrape_origin: "api",
       browser_id: "browser-1",
       mode: "prompt",
       prompt_length: 123,

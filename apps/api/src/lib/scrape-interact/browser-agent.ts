@@ -189,6 +189,11 @@ export interface BrowserAgentTraceContext {
   scrapeId: string;
   teamId: string;
   zeroDataRetention?: boolean;
+  scrapeUrl?: string;
+  targetUrl?: string;
+  scrapeWaitForMs?: number;
+  scrapeActions?: number;
+  scrapeOrigin?: string;
 }
 
 export async function executePromptViaBrowserAgent(
@@ -316,6 +321,11 @@ export async function executePromptViaBrowserAgent(
           browser_id: browserId,
           mode: "prompt",
           zeroDataRetention: trace.zeroDataRetention,
+          scrape_url: trace.scrapeUrl,
+          target_url: trace.targetUrl,
+          scrape_wait_for_ms: trace.scrapeWaitForMs,
+          scrape_actions: trace.scrapeActions,
+          scrape_origin: trace.scrapeOrigin,
         } satisfies InteractTraceMetadata,
         {
           name: "interact:prompt",

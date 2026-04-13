@@ -49,6 +49,17 @@ async function main() {
   const browserId = `browser-${uuidv7().slice(0, 8)}`;
   const teamId = "smoke-team";
 
+  // Pretend the scrape that kicked this session off targeted a pricing page
+  // with a couple of pre-actions and a short wait-for. This mirrors what the
+  // real controller passes through so the trace tells the full story.
+  const fakeScrapeContext = {
+    scrape_url: "https://example.com/pricing",
+    target_url: "https://example.com/pricing/",
+    scrape_wait_for_ms: 500,
+    scrape_actions: 2,
+    scrape_origin: "smoke-test",
+  };
+
   const baseMeta = (mode: "prompt" | "code"): InteractTraceMetadata => ({
     thread_id: sessionId,
     session_id: sessionId,
@@ -56,6 +67,7 @@ async function main() {
     team_id: teamId,
     browser_id: browserId,
     mode,
+    ...fakeScrapeContext,
   });
 
   console.log("==== LangSmith smoke — thread weaving ====");

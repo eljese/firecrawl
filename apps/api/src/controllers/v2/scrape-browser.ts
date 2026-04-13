@@ -39,7 +39,10 @@ import {
   executePromptViaBrowserAgent,
   AgentResult,
 } from "../../lib/scrape-interact/browser-agent";
-import { traceInteract } from "../../lib/scrape-interact/langsmith";
+import {
+  traceInteract,
+  sanitizeUrlForTrace,
+} from "../../lib/scrape-interact/langsmith";
 import { getScrapeZDR } from "../../lib/zdr-helpers";
 import { RequestWithAuth, ScrapeOptions } from "./types";
 import { billTeam } from "../../services/billing/credit_billing";
@@ -225,6 +228,24 @@ export async function scrapeInteractController(
   // ship the full prompt, tool I/O, and page snapshots to a third party.
   const zdrForced = getScrapeZDR(req.acuc?.flags) === "forced";
 
+  // Upstream context from the scrape job — interact extends scrape, so
+  // every run carries the URL / wait / actions / origin that set the stage
+  // for what the agent does on top of it. URLs are stripped of query
+  // strings to avoid leaking PII into LangSmith.
+  const scrapeOptions = (scrape.options ?? {}) as {
+    origin?: string;
+  };
+  const traceScrapeContext = {
+    scrapeUrl: sanitizeUrlForTrace(scrape.url),
+    targetUrl: sanitizeUrlForTrace(replayContext.targetUrl),
+    scrapeWaitForMs: replayContext.waitForMs,
+    scrapeActions: replayContext.actions.length,
+    scrapeOrigin:
+      typeof scrapeOptions.origin === "string"
+        ? scrapeOptions.origin
+        : undefined,
+  };
+
   let execResult: BrowserServiceExecResponse | AgentResult;
 
   if (prompt && !rawCode) {
@@ -243,6 +264,7 @@ export async function scrapeInteractController(
           scrapeId,
           teamId: req.auth.team_id,
           zeroDataRetention: zdrForced,
+          ...traceScrapeContext,
         },
       );
     } catch (err) {
@@ -280,6 +302,11 @@ export async function scrapeInteractController(
         browser_id: session.browser_id,
         mode: "code",
         zeroDataRetention: zdrForced,
+        scrape_url: traceScrapeContext.scrapeUrl,
+        target_url: traceScrapeContext.targetUrl,
+        scrape_wait_for_ms: traceScrapeContext.scrapeWaitForMs,
+        scrape_actions: traceScrapeContext.scrapeActions,
+        scrape_origin: traceScrapeContext.scrapeOrigin,
       },
       {
         name: "interact:code",
