@@ -4,8 +4,13 @@ import { logger as _logger } from "../logger";
 
 const logger = _logger.child({ module: "scrape-interact/langsmith" });
 
+// Trim once at module load — a whitespace-only LANGSMITH_API_KEY would be
+// truthy in JS, flip the gate on, and then every trace POST would silently
+// 401 against LangSmith with no other signal that something's wrong.
+const LANGSMITH_API_KEY = config.LANGSMITH_API_KEY?.trim() || undefined;
+
 export const isLangSmithEnabled = Boolean(
-  config.LANGSMITH_API_KEY &&
+  LANGSMITH_API_KEY &&
     (config.LANGSMITH_TRACING === undefined
       ? true
       : config.LANGSMITH_TRACING === true),
@@ -101,9 +106,10 @@ if (isLangSmithEnabled) {
 
     // Mirror our config into process.env only after the langsmith modules
     // loaded successfully. If init fails we fall back to the raw ai SDK
-    // without polluting the process env for other modules.
+    // without polluting the process env for other modules. Use the trimmed
+    // key so whitespace padding in .env can't reach the langsmith SDK.
     process.env.LANGSMITH_TRACING = "true";
-    process.env.LANGSMITH_API_KEY = config.LANGSMITH_API_KEY!;
+    process.env.LANGSMITH_API_KEY = LANGSMITH_API_KEY!;
     if (config.LANGSMITH_PROJECT) {
       process.env.LANGSMITH_PROJECT = config.LANGSMITH_PROJECT;
     }
