@@ -1,13 +1,18 @@
 /**
  * Live LangSmith smoke test for the /interact tracing wiring.
  *
- * Runs two simulated interact invocations under a single browser_session_id
- * so you can confirm in the LangSmith UI that:
- *   - prompt-mode (wrapped generateText) + its child tool spans nest correctly
- *   - code-mode (traceInteract) appears as a non-LLM sibling
- *   - both share the same thread_id, grouping them as one conversation
+ * Simulates a real interact session: one browser session that receives
+ * multiple /interact calls interleaving prompt-mode and code-mode. Each call
+ * is a separate root run in LangSmith; they all share the same thread_id so
+ * they weave into a single conversation thread in the LangSmith UI.
  *
- * Does NOT touch the browser service or fire-engine — the "tool" just returns
+ * Produces four root runs under one thread_id:
+ *   1. prompt-mode  — "find the pricing link"
+ *   2. code-mode    — console.log follow-up
+ *   3. prompt-mode  — "click the pricing link"
+ *   4. code-mode    — grab page title
+ *
+ * Does NOT touch the browser service or fire-engine — the "tool" returns
  * fake snapshot data so the agent loop terminates quickly.
  *
  * Usage:
@@ -53,7 +58,7 @@ async function main() {
     mode,
   });
 
-  console.log("==== LangSmith smoke ====");
+  console.log("==== LangSmith smoke — thread weaving ====");
   console.log("Project:      ", config.LANGSMITH_PROJECT ?? "(default)");
   console.log("Endpoint:     ", config.LANGSMITH_ENDPOINT ?? "(default)");
   console.log("thread_id:    ", sessionId);
@@ -61,95 +66,121 @@ async function main() {
   console.log("browser_id:   ", browserId);
   console.log("");
 
-  // ------------------------------------------------------------------
-  // Run 1: prompt-mode (wrapped generateText + fake browser tool)
-  // ------------------------------------------------------------------
-  const langsmith = buildLangSmithProviderOptions(baseMeta("prompt"), {
-    name: "interact:prompt",
-    extra: { smoke: true, prompt_length: 42 },
-  });
-
-  console.log("Run 1 (prompt-mode) — calling wrapped generateText…");
-
   const fakeSnapshotText = [
     "[1] @e1 button 'Search'",
     "[2] @e2 textbox 'Query'",
     "[3] @e3 link 'Pricing'",
   ].join("\n");
 
-  let toolCalls = 0;
-  const browserTool = tool({
-    description: "Fake agent-browser command runner for smoke testing.",
-    inputSchema: z.object({
-      code: z.string().describe("agent-browser command"),
-    }),
-    execute: async ({ code }) => {
-      toolCalls++;
-      if (code.includes("snapshot")) {
-        return { result: fakeSnapshotText };
-      }
-      if (code.includes("click")) {
-        return { result: "clicked" };
-      }
-      return { result: `stub for ${code}` };
-    },
-  });
-
-  const t0 = Date.now();
-  const result = await generateText({
-    model: getModel("gemini-2.5-flash", "google"),
-    system:
-      "You are a smoke test. Make exactly two tool calls: a 'agent-browser snapshot' then a 'agent-browser click @e3'. Then reply 'done'.",
-    messages: [
-      {
-        role: "user" as const,
-        content: [
-          {
-            type: "text" as const,
-            text: "Simulate two browser actions to produce a trace, then say done.",
-          },
-        ],
+  // Fake browser tool that mimics the real agent's tool — returns stubbed
+  // snapshot / click output so the Gemini loop can terminate quickly.
+  const makeBrowserTool = () => {
+    let toolCalls = 0;
+    const t = tool({
+      description: "Fake agent-browser command runner for smoke testing.",
+      inputSchema: z.object({
+        code: z.string().describe("agent-browser command"),
+      }),
+      execute: async ({ code }) => {
+        toolCalls++;
+        if (code.includes("snapshot")) return { result: fakeSnapshotText };
+        if (code.includes("click")) return { result: "clicked" };
+        if (code.includes("get title"))
+          return { result: "Pricing — Firecrawl" };
+        return { result: `stub for ${code}` };
       },
-    ],
-    tools: { browser: browserTool },
-    stopWhen: stepCountIs(5),
-    temperature: 0,
-    ...(langsmith
-      ? { providerOptions: { langsmith } as Record<string, any> }
-      : {}),
-  });
-  console.log(
-    `Run 1 complete in ${Date.now() - t0}ms — ${toolCalls} tool call(s). Text: ${(result.text || "").slice(0, 80)}`,
-  );
+    });
+    return { tool: t, calls: () => toolCalls };
+  };
+
+  // Shared traced code-exec — rebuilt per call so metadata is per-invocation.
+  const makeTracedExec = (meta: InteractTraceMetadata) =>
+    traceInteract(
+      async (payload: { code: string; language: string }) => {
+        await new Promise(r => setTimeout(r, 40));
+        return {
+          stdout: `echo: ${payload.code}`,
+          stderr: "",
+          exitCode: 0,
+          killed: false,
+          result: `executed ${payload.language}`,
+        };
+      },
+      meta,
+      { name: "interact:code" },
+    );
+
+  // Drives one prompt-mode invocation against the fake tool.
+  const runPrompt = async (
+    label: string,
+    taskDescription: string,
+    systemHint: string,
+  ) => {
+    const { tool: browserTool, calls } = makeBrowserTool();
+    const langsmith = buildLangSmithProviderOptions(baseMeta("prompt"), {
+      name: "interact:prompt",
+      extra: { smoke: true, label },
+    });
+    const t0 = Date.now();
+    const result = await generateText({
+      model: getModel("gemini-2.5-flash", "google"),
+      system: `You are a smoke test. ${systemHint} After the tool calls, reply 'done'.`,
+      messages: [
+        {
+          role: "user" as const,
+          content: [{ type: "text" as const, text: taskDescription }],
+        },
+      ],
+      tools: { browser: browserTool },
+      stopWhen: stepCountIs(5),
+      temperature: 0,
+      ...(langsmith
+        ? { providerOptions: { langsmith } as Record<string, any> }
+        : {}),
+    });
+    console.log(
+      `  ${label} complete in ${Date.now() - t0}ms — ${calls()} tool call(s). Text: ${(result.text || "").slice(0, 60)}`,
+    );
+  };
+
+  const runCode = async (
+    label: string,
+    code: string,
+    language: "node" | "python" | "bash" = "node",
+  ) => {
+    const tracedExec = makeTracedExec(baseMeta("code"));
+    const t0 = Date.now();
+    const execResult = await tracedExec({ code, language });
+    console.log(
+      `  ${label} complete in ${Date.now() - t0}ms — exitCode=${execResult.exitCode} result=${execResult.result}`,
+    );
+  };
 
   // ------------------------------------------------------------------
-  // Run 2: code-mode (traceInteract on a fake browser exec)
+  // Interleave prompt + code invocations against the same session.
+  // Each is a separate root run; they all share the same thread_id.
   // ------------------------------------------------------------------
-  console.log("");
-  console.log("Run 2 (code-mode) — calling traceInteract wrapper…");
-
-  const fakeExec = traceInteract(
-    async (payload: { code: string; language: string }) => {
-      await new Promise(r => setTimeout(r, 50));
-      return {
-        stdout: "fake stdout",
-        stderr: "",
-        exitCode: 0,
-        killed: false,
-        result: `executed ${payload.language}`,
-      };
-    },
-    baseMeta("code"),
-    { name: "interact:code" },
+  console.log("Invocation 1 (prompt-mode) — find the pricing link");
+  await runPrompt(
+    "Invocation 1",
+    "Simulate finding the pricing link: call 'agent-browser snapshot'.",
+    "Make exactly one tool call: 'agent-browser snapshot'.",
   );
 
-  const t1 = Date.now();
-  const execResult = await fakeExec({
-    code: "console.log('hello from smoke')",
-    language: "node",
-  });
-  console.log(
-    `Run 2 complete in ${Date.now() - t1}ms — exitCode=${execResult.exitCode} result=${execResult.result}`,
+  console.log("Invocation 2 (code-mode) — console.log follow-up");
+  await runCode("Invocation 2", "console.log('pricing found')");
+
+  console.log("Invocation 3 (prompt-mode) — click the pricing link");
+  await runPrompt(
+    "Invocation 3",
+    "Simulate clicking the pricing link: call 'agent-browser click @e3'.",
+    "Make exactly one tool call: 'agent-browser click @e3'.",
+  );
+
+  console.log("Invocation 4 (code-mode) — grab page title via JS");
+  await runCode(
+    "Invocation 4",
+    "const t = await page.title(); console.log(t);",
   );
 
   // ------------------------------------------------------------------
@@ -167,8 +198,17 @@ async function main() {
   const projectName = config.LANGSMITH_PROJECT ?? undefined;
   const filter = `and(in(metadata_key, ["thread_id","session_id"]), eq(metadata_value, "${sessionId}"))`;
 
-  let found: Array<{ name?: string; id?: string; run_type?: string }> = [];
-  const deadline = Date.now() + 15000;
+  const expectedRoots = 4;
+  type LsRun = {
+    name?: string;
+    id?: string;
+    run_type?: string;
+    start_time?: string;
+    extra?: { metadata?: Record<string, unknown> };
+  };
+
+  let found: LsRun[] = [];
+  const deadline = Date.now() + 20000;
   while (Date.now() < deadline) {
     found = [];
     try {
@@ -177,7 +217,7 @@ async function main() {
         filter,
         isRoot: true,
       })) {
-        found.push(run as { name?: string; id?: string; run_type?: string });
+        found.push(run as LsRun);
       }
     } catch (err) {
       console.warn(
@@ -185,28 +225,46 @@ async function main() {
         err instanceof Error ? err.message : err,
       );
     }
-    if (found.length >= 2) break;
+    if (found.length >= expectedRoots) break;
     await new Promise(r => setTimeout(r, 1500));
   }
 
+  // Sort by start_time so the order matches the invocation order.
+  found.sort((a, b) => {
+    const ta = a.start_time ? Date.parse(a.start_time) : 0;
+    const tb = b.start_time ? Date.parse(b.start_time) : 0;
+    return ta - tb;
+  });
+
   console.log("");
-  console.log(`Root runs found for thread_id=${sessionId}: ${found.length}`);
+  console.log(
+    `Root runs found for thread_id=${sessionId}: ${found.length} (expected ${expectedRoots})`,
+  );
   for (const r of found) {
-    console.log(`  - ${r.run_type ?? "?"} :: ${r.name ?? "(no name)"} :: ${r.id}`);
+    const meta = r.extra?.metadata ?? {};
+    const mode = (meta as { mode?: string }).mode ?? "?";
+    console.log(`  - [${mode.padEnd(6)}] ${r.name ?? "(no name)"} :: ${r.id}`);
   }
+
+  const threadIdsMatch = found.every(
+    r =>
+      (r.extra?.metadata as { thread_id?: string } | undefined)?.thread_id ===
+      sessionId,
+  );
+  console.log(
+    `All runs share thread_id=${sessionId}? ${threadIdsMatch ? "yes" : "no"}`,
+  );
 
   console.log("");
   console.log("==== Done ====");
   console.log(
     `Open LangSmith → ${config.LANGSMITH_PROJECT ?? "(default project)"}`,
   );
-  console.log(
-    `Filter: metadata.thread_id = "${sessionId}"`,
-  );
+  console.log(`Filter: metadata.thread_id = "${sessionId}"`);
 
-  if (found.length < 2) {
+  if (found.length < expectedRoots || !threadIdsMatch) {
     console.error(
-      `Expected 2 root runs (prompt-mode + code-mode), got ${found.length}. Check network / API key.`,
+      `Expected ${expectedRoots} root runs sharing thread_id, got ${found.length} (thread match: ${threadIdsMatch}).`,
     );
     process.exit(2);
   }
