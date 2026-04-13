@@ -454,7 +454,7 @@ const baseScrapeOptions = z.strictObject({
     .optional(),
   onlyMainContent: z.boolean().prefault(true),
   onlyCleanContent: z.boolean().prefault(false),
-  timeout: z.int().positive().min(1000).max(600000).optional(),
+  timeout: z.int().positive().min(1000).max(300000).optional(),
   waitFor: z.int().nonnegative().finite().max(60000).prefault(0),
   // Deprecate this to jsonOptions
   extract: extractOptions.optional(),
@@ -723,7 +723,7 @@ const extractV1Options = z
     origin: z.string().optional().prefault("api"),
     integration: integrationSchema.optional().transform(val => val || null),
     urlTrace: z.boolean().prefault(false),
-    timeout: z.int().positive().min(1000).max(600000).prefault(60000),
+    timeout: z.int().positive().min(1000).max(300000).prefault(60000),
     __experimental_streamSteps: z.boolean().prefault(false),
     __experimental_llmUsage: z.boolean().prefault(false),
     __experimental_showSources: z.boolean().prefault(false),
@@ -785,7 +785,7 @@ const scrapeRequestSchemaBase = baseScrapeOptions
     jsonOptions: extractOptionsWithAgent.optional(),
     origin: z.string().optional().prefault("api"),
     integration: integrationSchema.optional().transform(val => val || null),
-    timeout: z.int().positive().min(1000).max(600000).prefault(30000),
+    timeout: z.int().positive().min(1000).max(300000).prefault(30000),
     zeroDataRetention: z.boolean().optional(),
   })
   .strict();
@@ -1534,7 +1534,7 @@ export const searchRequestSchema = z
     location: z.string().optional(),
     origin: z.string().optional().prefault("api"),
     integration: integrationSchema.optional().transform(val => val || null),
-    timeout: z.int().positive().finite().max(600000).prefault(60000),
+    timeout: z.int().positive().finite().max(300000).prefault(60000),
     ignoreInvalidURLs: z.boolean().optional().prefault(false),
     __searchPreviewToken: z.string().optional(),
     scrapeOptions: baseScrapeOptions
