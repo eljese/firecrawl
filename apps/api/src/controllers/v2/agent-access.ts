@@ -8,15 +8,17 @@ import { config } from "../../config";
 import { logger as _logger } from "../../lib/logger";
 import { apiKeyToFcApiKey } from "../../lib/parseApi";
 import {
-  clearAgentSponsorCache,
   getAgentSponsorByRequestId,
   getAgentSponsorByToken,
   markSponsorBlocked,
   markSponsorVerified,
 } from "../../services/agent-sponsor";
+import {
+  autumnService,
+  isAutumnEnabled,
+} from "../../services/autumn/autumn.service";
 import { redisRateLimitClient } from "../../services/rate-limiter";
 import { supabase_rr_service, supabase_service } from "../../services/supabase";
-import { clearACUC } from "../auth";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -94,7 +96,7 @@ const statusPollLimiter = new RateLimiterRedis({
   storeClient: redisRateLimitClient,
   keyPrefix: "agent_access_status_ip",
   points: 60,
-  duration: 60, // 60 requests per minute per IP
+  duration: 60,
 });
 
 const approveRejectLimiter = new RateLimiterRedis({
@@ -132,6 +134,9 @@ const tokenSchema = z.object({
 
 // ---------------------------------------------------------------------------
 // POST /v2/agent-access/request
+//
+// Agent initiates an access request. NO key or account is created here.
+// The human must approve first.
 // ---------------------------------------------------------------------------
 
 export async function agentAccessRequestController(
@@ -174,7 +179,7 @@ export async function agentAccessRequestController(
       });
     }
 
-    // --- Check for blocked sponsor ---
+    // --- Check for blocked email ---
     const { data: blockedSponsor } = await supabase_service
       .from("agent_sponsors")
       .select("id")
@@ -207,80 +212,10 @@ export async function agentAccessRequestController(
           login_url: "https://firecrawl.dev/signin",
         });
       }
-      // Expired pending request — allow a new one to be created
+      // Expired pending — allow a new one
     }
 
-    // --- Create sandboxed account ---
-    const sandboxId = crypto.randomUUID();
-    const syntheticEmail = `agent-${sandboxId}@agent.sandbox.firecrawl.dev`;
-
-    const { data: newUser, error: newUserError } =
-      await supabase_service.auth.admin.createUser({
-        email: syntheticEmail,
-        email_confirm: true,
-        user_metadata: {
-          referrer_integration: "agent_access",
-          agent_name,
-        },
-      });
-
-    if (newUserError) {
-      logger.error("Failed to create sandboxed user", { error: newUserError });
-      return res
-        .status(500)
-        .json({ success: false, error: "Failed to create agent account." });
-    }
-
-    // Fetch team and API key created by the handle_new_user trigger
-    const { data: fcUser, error: fcUserError } = await supabase_service
-      .from("users")
-      .select("team_id")
-      .eq("id", newUser.user.id)
-      .single();
-
-    if (fcUserError || !fcUser) {
-      logger.error("Failed to look up sandboxed user after creation", {
-        error: fcUserError,
-      });
-      return res
-        .status(500)
-        .json({ success: false, error: "Failed to create agent account." });
-    }
-
-    const teamId = fcUser.team_id;
-
-    const { data: apiKeyData, error: apiKeyError } = await supabase_service
-      .from("api_keys")
-      .select("id, key")
-      .eq("team_id", teamId)
-      .limit(1)
-      .single();
-
-    if (apiKeyError || !apiKeyData) {
-      logger.error("Failed to look up API key for sandboxed team", {
-        error: apiKeyError,
-      });
-      return res
-        .status(500)
-        .json({ success: false, error: "Failed to create agent account." });
-    }
-
-    // Mark as agent-provisioned
-    const { error: updateKeyError } = await supabase_service
-      .from("api_keys")
-      .update({ agent_provisioned: true } as any)
-      .eq("id", apiKeyData.id);
-
-    if (updateKeyError) {
-      logger.error("Failed to mark API key as agent_provisioned", {
-        error: updateKeyError,
-      });
-      return res
-        .status(500)
-        .json({ success: false, error: "Failed to create agent account." });
-    }
-
-    // --- Create sponsor record ---
+    // --- Create the access request record (no account, no key) ---
     const verificationToken = crypto.randomBytes(32).toString("hex");
     const requestId = generateRequestId();
 
@@ -294,8 +229,6 @@ export async function agentAccessRequestController(
         status: "pending",
         verification_deadline: deadline.toISOString(),
         agent_name,
-        sandboxed_team_id: teamId,
-        api_key_id: apiKeyData.id,
         requesting_ip: incomingIP,
         tos_version: "2024-11-05",
         tos_hash: crypto
@@ -308,27 +241,13 @@ export async function agentAccessRequestController(
       } as any);
 
     if (sponsorError) {
-      logger.error("Failed to create sponsor record", { error: sponsorError });
+      logger.error("Failed to create access request record", {
+        error: sponsorError,
+      });
       return res
         .status(500)
         .json({ success: false, error: "Failed to create access request." });
     }
-
-    // --- Assign onboarding credits coupon (50 credits) ---
-    await supabase_service
-      .from("coupons")
-      .insert({
-        team_id: teamId,
-        credits: 50,
-        status: "active",
-        code: `agent-access-${requestId}`,
-        expires_at: deadline.toISOString(),
-      } as any)
-      .then(({ error }) => {
-        if (error) {
-          logger.warn("Failed to create onboarding coupon", { error });
-        }
-      });
 
     // --- Send approval email ---
     const approveUrl = `https://firecrawl.dev/agent-confirm?${qs.stringify({
@@ -365,11 +284,11 @@ export async function agentAccessRequestController(
             <p style="margin: 15px 0;">Hey there,</p>
             <p style="margin: 15px 0;">An AI agent called <strong>${escapeHtml(agent_name)}</strong> is requesting Firecrawl API access on your behalf.</p>
             ${useCaseBlock}
-            <p style="margin: 15px 0;">The agent has a sandboxed key with <strong>50 credits</strong>. Approve to link it to your account and unlock your full plan:</p>
+            <p style="margin: 15px 0;">By approving, you accept the <a href="https://firecrawl.dev/terms-of-service" style="color: #FF6B35;">Terms of Service</a> and an API key will be created for the agent under your account.</p>
             <p style="margin: 30px 0;">
               <a href="${approveUrl}" style="background-color: #FA5D19; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Approve Access</a>
             </p>
-            <p style="margin: 15px 0;">If you didn't authorize this, reject and block the key:</p>
+            <p style="margin: 15px 0;">If you didn't authorize this:</p>
             <p style="margin: 15px 0;"><a href="${rejectUrl}" style="color: #FF6B35;">Reject &amp; Block</a></p>
             <p style="margin: 15px 0;">This link expires on <strong>${deadline.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</strong>.</p>
             <p style="margin: 15px 0;">Questions? <a href="mailto:help@firecrawl.com" style="color: #FF6B35;">help@firecrawl.com</a></p>
@@ -385,7 +304,7 @@ export async function agentAccessRequestController(
       }
     }
 
-    // --- In-app notification for existing users ---
+    // --- In-app notification for existing Firecrawl users ---
     const { data: existingUser } = await supabase_rr_service
       .from("users")
       .select("team_id")
@@ -397,7 +316,7 @@ export async function agentAccessRequestController(
         .from("user_notifications")
         .insert({
           team_id: existingUser[0].team_id,
-          notification_type: "agentSponsorConfirm",
+          notification_type: "agentAccessRequest",
           sent_date: new Date().toISOString(),
           timestamp: new Date().toISOString(),
           metadata: {
@@ -405,7 +324,6 @@ export async function agentAccessRequestController(
             use_case: use_case || null,
             confirm_url: approveUrl,
             block_url: rejectUrl,
-            verification_token: verificationToken,
             deadline: deadline.toISOString(),
           },
         } as any)
@@ -418,20 +336,15 @@ export async function agentAccessRequestController(
     logger.info("Agent access request created", {
       email,
       agent_name,
-      teamId,
       requestId,
-      apiKeyId: apiKeyData.id,
     });
 
     return res.status(201).json({
       success: true,
-      api_key: apiKeyToFcApiKey(apiKeyData.key),
       request_id: requestId,
       status: "pending",
       status_url: `https://api.firecrawl.dev/v2/agent-access/${requestId}/status`,
-      sandbox_credits: 50,
       approval_expires_at: deadline.toISOString(),
-      tos_url: "https://firecrawl.dev/terms-of-service",
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -450,6 +363,8 @@ export async function agentAccessRequestController(
 
 // ---------------------------------------------------------------------------
 // GET /v2/agent-access/:requestId/status
+//
+// Agent polls this. Returns the api_key ONLY after the human has approved.
 // ---------------------------------------------------------------------------
 
 export async function agentAccessStatusController(req: Request, res: Response) {
@@ -491,15 +406,24 @@ export async function agentAccessStatusController(req: Request, res: Response) {
       approval_expires_at: sponsor.verification_deadline,
     };
 
-    // If approved, confirm the key is live
     if (sponsor.status === "verified") {
-      response.message =
-        "Access approved. Your API key is now linked to the account holder's plan.";
+      // Approved — return the API key so the agent can start using it
+      if (sponsor.api_key_id) {
+        const { data: keyData } = await supabase_rr_service
+          .from("api_keys")
+          .select("key")
+          .eq("id", sponsor.api_key_id)
+          .single();
+
+        if (keyData) {
+          response.api_key = apiKeyToFcApiKey(keyData.key);
+        }
+      }
+      response.message = "Access approved. Your API key is ready.";
     } else if (sponsor.status === "blocked") {
       response.message =
         "Access rejected. The account holder blocked this request.";
     } else {
-      // pending
       const deadline = new Date(sponsor.verification_deadline);
       if (deadline < new Date()) {
         response.status = "expired";
@@ -521,6 +445,9 @@ export async function agentAccessStatusController(req: Request, res: Response) {
 
 // ---------------------------------------------------------------------------
 // POST /v2/agent-access/approve
+//
+// Human approves. This is where the account + API key are created.
+// The human accepting this link constitutes terms acceptance.
 // ---------------------------------------------------------------------------
 
 export async function agentAccessApproveController(
@@ -579,109 +506,153 @@ export async function agentAccessApproveController(
       });
     }
 
-    // --- Merge key into real account (or promote sandbox) ---
+    // --- Create the account and API key now that human has approved ---
     const { data: existingUser } = await supabase_rr_service
       .from("users")
       .select("id, team_id")
       .eq("email", sponsor.email)
       .limit(1);
 
+    let teamId: string;
+    let apiKeyId: number;
+
     if (existingUser && existingUser.length > 0) {
-      // Existing user: move key to their real team
-      const realTeamId = existingUser[0].team_id;
-      const realUserId = existingUser[0].id;
+      // Existing Firecrawl user — add a new agent key to their team
+      teamId = existingUser[0].team_id;
 
-      const { error: moveKeyError } = await supabase_service
+      const { data: newKey, error: newKeyError } = await supabase_service
         .from("api_keys")
-        .update({ team_id: realTeamId, owner_id: realUserId } as any)
-        .eq("id", sponsor.api_key_id);
+        .insert({
+          name: `Agent: ${sponsor.agent_name}`,
+          team_id: teamId,
+          owner_id: existingUser[0].id,
+          agent_provisioned: true,
+        } as any)
+        .select("id, key")
+        .single();
 
-      if (moveKeyError) {
-        logger.error("Failed to move API key to real team", {
-          error: moveKeyError,
+      if (newKeyError || !newKey) {
+        logger.error("Failed to create API key for existing user", {
+          error: newKeyError,
         });
         return res
           .status(500)
-          .json({ success: false, error: "Failed to approve access." });
+          .json({ success: false, error: "Failed to create API key." });
       }
 
-      // Carry over credit usage
-      const { error: creditMoveError } = await supabase_service
-        .from("credit_usage")
-        .update({ team_id: realTeamId } as any)
-        .eq("team_id", sponsor.sandboxed_team_id);
+      apiKeyId = newKey.id;
 
-      if (creditMoveError) {
-        logger.warn("Failed to carry over credit usage", {
-          error: creditMoveError,
+      logger.info("Created agent key for existing user", {
+        email: sponsor.email,
+        teamId,
+        apiKeyId,
+      });
+    } else {
+      // New user — create a full account via Supabase auth (triggers
+      // handle_new_user which creates org → team → default api_key)
+      const { data: newUser, error: newUserError } =
+        await supabase_service.auth.admin.createUser({
+          email: sponsor.email,
+          email_confirm: true,
+          user_metadata: {
+            referrer_integration: "agent_access",
+            agent_name: sponsor.agent_name,
+          },
+        });
+
+      if (newUserError) {
+        logger.error("Failed to create user account", {
+          error: newUserError,
+        });
+        return res
+          .status(500)
+          .json({ success: false, error: "Failed to create account." });
+      }
+
+      // Fetch the team and key created by the trigger
+      const { data: fcUser, error: fcUserError } = await supabase_service
+        .from("users")
+        .select("team_id")
+        .eq("id", newUser.user.id)
+        .single();
+
+      if (fcUserError || !fcUser) {
+        logger.error("Failed to look up user after creation", {
+          error: fcUserError,
+        });
+        return res
+          .status(500)
+          .json({ success: false, error: "Failed to create account." });
+      }
+
+      teamId = fcUser.team_id;
+
+      const { data: keyData, error: keyError } = await supabase_service
+        .from("api_keys")
+        .select("id, key")
+        .eq("team_id", teamId)
+        .limit(1)
+        .single();
+
+      if (keyError || !keyData) {
+        logger.error("Failed to look up API key for new user", {
+          error: keyError,
+        });
+        return res
+          .status(500)
+          .json({ success: false, error: "Failed to create account." });
+      }
+
+      apiKeyId = keyData.id;
+
+      // Mark the key as agent-provisioned
+      await supabase_service
+        .from("api_keys")
+        .update({
+          agent_provisioned: true,
+          name: `Agent: ${sponsor.agent_name}`,
+        } as any)
+        .eq("id", apiKeyId);
+
+      // Provision billing if Autumn is enabled
+      if (isAutumnEnabled()) {
+        const { data: teamWithOrg } = await supabase_service
+          .from("teams")
+          .select("org_id")
+          .eq("id", teamId)
+          .single();
+
+        await autumnService.ensureTeamProvisioned({
+          teamId,
+          orgId: teamWithOrg?.org_id ?? undefined,
         });
       }
 
-      // Ban sandbox team
-      await supabase_service
-        .from("teams")
-        .update({ banned: true })
-        .eq("id", sponsor.sandboxed_team_id);
-
-      logger.info("Agent key merged into existing account", {
+      logger.info("Created new account via agent access approval", {
         email: sponsor.email,
-        realTeamId,
-        apiKeyId: sponsor.api_key_id,
-      });
-    } else {
-      // No existing user: promote sandbox to real account
-      const { data: sandboxedUsers } = await supabase_service
-        .from("users")
-        .select("id")
-        .eq("team_id", sponsor.sandboxed_team_id)
-        .limit(1);
-
-      if (sandboxedUsers && sandboxedUsers.length > 0) {
-        const userId = sandboxedUsers[0].id;
-
-        const { error: updateAuthError } =
-          await supabase_service.auth.admin.updateUserById(userId, {
-            email: sponsor.email,
-          });
-
-        if (updateAuthError) {
-          logger.error("Failed to update auth user email", {
-            error: updateAuthError,
-          });
-          return res
-            .status(500)
-            .json({ success: false, error: "Failed to approve access." });
-        }
-
-        await supabase_service
-          .from("users")
-          .update({ email: sponsor.email })
-          .eq("id", userId);
-      }
-
-      logger.info("Sandboxed account promoted to real account", {
-        email: sponsor.email,
-        apiKeyId: sponsor.api_key_id,
+        teamId,
+        apiKeyId,
       });
     }
 
-    // Mark verified + clear caches
+    // --- Link the sponsor record to the new key ---
+    const { error: linkError } = await supabase_service
+      .from("agent_sponsors")
+      .update({ api_key_id: apiKeyId } as any)
+      .eq("id", sponsor.id);
+
+    if (linkError) {
+      logger.error("Failed to link api_key_id to sponsor record", {
+        error: linkError,
+      });
+    }
+
+    // Mark verified
     await markSponsorVerified({ sponsorId: sponsor.id });
-    await clearAgentSponsorCache({ apiKeyId: sponsor.api_key_id });
-
-    const { data: apiKeyData } = await supabase_service
-      .from("api_keys")
-      .select("key")
-      .eq("id", sponsor.api_key_id)
-      .single();
-
-    if (apiKeyData) {
-      await clearACUC(apiKeyData.key);
-    }
 
     return res.status(200).json({
       success: true,
-      message: "Access approved. The agent's API key is now fully active.",
+      message: "Access approved. The agent can now retrieve its API key.",
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -699,6 +670,8 @@ export async function agentAccessApproveController(
 
 // ---------------------------------------------------------------------------
 // POST /v2/agent-access/reject
+//
+// Human rejects. No account or key was ever created, so just mark blocked.
 // ---------------------------------------------------------------------------
 
 export async function agentAccessRejectController(req: Request, res: Response) {
@@ -745,46 +718,16 @@ export async function agentAccessRejectController(req: Request, res: Response) {
       });
     }
 
-    // Fetch key value for cache clearing
-    const { data: apiKeyData } = await supabase_service
-      .from("api_keys")
-      .select("key")
-      .eq("id", sponsor.api_key_id)
-      .single();
-
-    // Delete the API key
-    await supabase_service
-      .from("api_keys")
-      .delete()
-      .eq("id", sponsor.api_key_id);
-
-    // Clear ACUC cache
-    if (apiKeyData) {
-      try {
-        await clearACUC(apiKeyData.key);
-      } catch (err) {
-        logger.warn("Failed to clear ACUC cache", { error: err });
-      }
-    }
-
-    // Ban sandbox team
-    await supabase_service
-      .from("teams")
-      .update({ banned: true })
-      .eq("id", sponsor.sandboxed_team_id);
-
-    // Mark blocked
+    // Mark blocked — nothing else to clean up since no key was ever created
     await markSponsorBlocked({ sponsorId: sponsor.id });
-    await clearAgentSponsorCache({ apiKeyId: sponsor.api_key_id });
 
     logger.info("Agent access rejected", {
       email: sponsor.email,
-      apiKeyId: sponsor.api_key_id,
     });
 
     return res.status(200).json({
       success: true,
-      message: "Access rejected. The agent's key has been disabled.",
+      message: "Access rejected and blocked.",
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
