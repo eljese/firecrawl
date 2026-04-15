@@ -40,7 +40,7 @@ export function checkPermissions(
     robotsMode !== "forced"
   ) {
     return {
-      error: `The ignoreRobotsTxt parameter is an enterprise feature. Contact ${SUPPORT_EMAIL} to enable it for your team.`,
+      error: `The ignoreRobotsTxt parameter is an enterprise feature. Contact ${SUPPORT_EMAIL} to explore whether it can be enabled for your team.`,
     };
   }
   if (
@@ -49,7 +49,7 @@ export function checkPermissions(
     robotsMode !== "forced"
   ) {
     return {
-      error: `The robotsUserAgent parameter is an enterprise feature. Contact ${SUPPORT_EMAIL} to enable it for your team.`,
+      error: `The robotsUserAgent parameter is an enterprise feature. Contact ${SUPPORT_EMAIL} to explore whether it can be enabled for your team.`,
     };
   }
 
