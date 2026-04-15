@@ -9,9 +9,10 @@ interface APIRequest {
   scrapeOptions?: {
     location?: LocationOptions;
   };
-  // crawl-specific fields (flattened from crawlerOptions)
-  ignoreRobotsTxt?: boolean;
-  robotsUserAgent?: string;
+  crawlerOptions?: {
+    ignoreRobotsTxt?: boolean;
+    robotsUserAgent?: string;
+  };
 }
 
 const SUPPORT_EMAIL = "support@firecrawl.com";
@@ -35,7 +36,7 @@ export function checkPermissions(
   // robots perms — ignoreRobots must be 'allowed' or 'forced'
   const robotsMode = getIgnoreRobots(flags);
   if (
-    request.ignoreRobotsTxt &&
+    request.crawlerOptions?.ignoreRobotsTxt &&
     robotsMode !== "allowed" &&
     robotsMode !== "forced"
   ) {
@@ -44,7 +45,7 @@ export function checkPermissions(
     };
   }
   if (
-    request.robotsUserAgent &&
+    request.crawlerOptions?.robotsUserAgent &&
     robotsMode !== "allowed" &&
     robotsMode !== "forced"
   ) {
