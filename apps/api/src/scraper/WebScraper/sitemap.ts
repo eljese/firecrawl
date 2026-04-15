@@ -7,7 +7,7 @@ import type { Logger } from "winston";
 import { CostTracking } from "../../lib/cost-tracking";
 import { ScrapeJobTimeoutError } from "../../lib/error";
 import type { ScrapeOptions } from "../../controllers/v2/types";
-import { Engine } from "../scrapeURL/engines";
+import { Engine } from "../scrapeURL/adapters";
 import {
   ParsedSitemap,
   parseSitemapXml,
@@ -16,7 +16,7 @@ import {
 } from "@mendable/firecrawl-rs";
 import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
-import { fetchFileToBuffer } from "../scrapeURL/engines/utils/downloadFile";
+import { fetchFileToBuffer } from "../scrapeURL/adapters/utils/downloadFile";
 import { useIndex } from "../../services";
 
 const useFireEngine =
@@ -80,24 +80,12 @@ export async function getLinksFromSitemap(
       }
     } else {
       try {
-        const shouldPrioritizeFireEngine =
-          location && mode === "fire-engine" && useFireEngine;
-
         const forceEngine: Engine[] = [
           ...(maxAge > 0 && useIndex ? ["index" as const] : []),
-          ...(shouldPrioritizeFireEngine
+          ...(mode === "fire-engine" && useFireEngine
             ? [
-                "fire-engine;tlsclient" as const,
-                "fire-engine;tlsclient;stealth" as const,
-              ]
-            : []),
-          "fetch",
-          ...(!shouldPrioritizeFireEngine &&
-          mode === "fire-engine" &&
-          useFireEngine
-            ? [
-                "fire-engine;tlsclient" as const,
-                "fire-engine;tlsclient;stealth" as const,
+                "fire-engine;chrome-cdp" as const,
+                "fire-engine;chrome-cdp;stealth" as const,
               ]
             : []),
         ];

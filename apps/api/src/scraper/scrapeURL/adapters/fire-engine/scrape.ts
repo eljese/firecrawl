@@ -25,21 +25,18 @@ export type FireEngineScrapeRequestCommon = {
   headers?: { [K: string]: string };
 
   blockMedia?: boolean; // default: true
-  // pageOptions?: any; // unused, .scrollXPaths is considered on FE side
-
-  // useProxy?: boolean; // unused, default: true
-  // customProxy?: string; // unused
-
-  // disableSmartWaitCache?: boolean; // unused, default: false
-  // skipDnsCheck?: boolean; // unused, default: false
 
   priority?: number; // default: 1
-  // team_id?: string; // unused
   logRequest?: boolean; // default: true
   instantReturn?: boolean; // default: false
   geolocation?: { country?: string; languages?: string[] };
 
-  mobileProxy?: boolean; // leave it undefined if user doesn't specify
+  // Proxy selection is owned by the caller — provide a pre-resolved proxy in
+  // fire-engine's `host:port:user:pass` format and the worker will use it
+  // as-is without invoking its own proxy API. `mobileProxy` is only used for
+  // telemetry when `customProxy` is set.
+  customProxy?: string;
+  mobileProxy?: boolean;
 
   timeout?: number;
   saveScrapeResultToGCS?: boolean;
@@ -54,12 +51,13 @@ export type FireEngineScrapeRequestChromeCDP = {
   mobile?: boolean;
   disableSmartWaitCache?: boolean;
   persistentStorage?: { uniqueId: string };
-};
-
-export type FireEngineScrapeRequestTLSClient = {
-  engine: "tlsclient";
-  atsv?: boolean; // v0 only, default: false
-  disableJsDom?: boolean; // v0 only, default: false
+  // When set, the worker injects this HTML as the main-document response via
+  // CDP Fetch.fulfillRequest, so Chrome skips its own initial fetch.
+  prefetch?: {
+    html: string;
+    status: number;
+    headers: Array<{ name: string; value: string }>;
+  };
 };
 
 const successSchema = z.object({
@@ -156,17 +154,13 @@ const failedSchema = z.object({
 
 export const fireEngineURL =
   config.FIRE_ENGINE_BETA_URL ?? "<mock-fire-engine-url>";
-export const fireEngineStagingURL =
+const fireEngineStagingURL =
   config.FIRE_ENGINE_STAGING_URL ?? "<mock-fire-engine-url>";
 
-export async function fireEngineScrape<
-  Engine extends
-    | FireEngineScrapeRequestChromeCDP
-    | FireEngineScrapeRequestTLSClient,
->(
+export async function fireEngineScrape(
   meta: Meta,
   logger: Logger,
-  request: FireEngineScrapeRequestCommon & Engine,
+  request: FireEngineScrapeRequestCommon & FireEngineScrapeRequestChromeCDP,
   mock: MockState | null,
   abort?: AbortSignal,
   baseUrl: string = fireEngineURL,
@@ -205,7 +199,6 @@ export async function fireEngineScrape<
       throw new UnsupportedFileError(successParse.data.pageError);
     }
 
-    logger.debug("Scrape succeeded!");
     return successParse.data;
   } else if (processingParse.success) {
     return processingParse.data;

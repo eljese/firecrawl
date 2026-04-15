@@ -2,7 +2,6 @@ import path from "path";
 import os from "os";
 import { createWriteStream, promises as fs } from "node:fs";
 import {
-  AddFeatureError,
   DNSResolutionError,
   EngineError,
   SiteError,
@@ -79,7 +78,7 @@ export async function fetchFileToBuffer(
   }
 }
 
-export async function downloadFile(
+async function downloadFile(
   id: string,
   url: string,
   skipTlsVerification: boolean = false,

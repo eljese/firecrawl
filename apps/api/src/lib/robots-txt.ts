@@ -3,7 +3,7 @@ import { config } from "../config";
 import { Logger } from "winston";
 import { ScrapeOptions, scrapeOptions } from "../controllers/v2/types";
 import { scrapeURL } from "../scraper/scrapeURL";
-import { Engine } from "../scraper/scrapeURL/engines";
+import { Engine } from "../scraper/scrapeURL/adapters";
 import { CostTracking } from "./cost-tracking";
 import { useIndex } from "../services";
 
@@ -36,25 +36,10 @@ export async function fetchRobotsTxt(
   const urlObj = new URL(url);
   const robotsTxtUrl = `${urlObj.protocol}//${urlObj.host}/robots.txt`;
 
-  const shouldPrioritizeFireEngine = location && useFireEngine;
-
   const forceEngine: Engine[] = [
     ...(useIndex ? ["index" as const] : []),
-    ...(shouldPrioritizeFireEngine
+    ...(useFireEngine
       ? [
-          "fire-engine;tlsclient" as const,
-          "fire-engine;tlsclient;stealth" as const,
-          // final fallback to chrome-cdp to fill the index
-          "fire-engine;chrome-cdp" as const,
-          "fire-engine;chrome-cdp;stealth" as const,
-        ]
-      : []),
-    "fetch",
-    ...(!shouldPrioritizeFireEngine && useFireEngine
-      ? [
-          "fire-engine;tlsclient" as const,
-          "fire-engine;tlsclient;stealth" as const,
-          // final fallback to chrome-cdp to fill the index
           "fire-engine;chrome-cdp" as const,
           "fire-engine;chrome-cdp;stealth" as const,
         ]

@@ -1,10 +1,10 @@
 import { parseMarkdown } from "../../../lib/html-to-markdown";
 import { Meta } from "..";
 import { Document } from "../../../controllers/v2/types";
-import { htmlTransform } from "../lib/removeUnwantedElements";
-import { extractLinks } from "../lib/extractLinks";
-import { extractImages } from "../lib/extractImages";
-import { extractMetadata } from "../lib/extractMetadata";
+import { htmlTransform } from "../lib/html/removeUnwantedElements";
+import { extractLinks } from "../lib/html/extractLinks";
+import { extractImages } from "../lib/html/extractImages";
+import { extractMetadata } from "../lib/html/extractMetadata";
 import {
   performLLMExtract,
   performSummary,
@@ -19,7 +19,7 @@ import { performAttributes } from "./performAttributes";
 import { deriveDiff } from "./diff";
 import { fetchAudio } from "./audio";
 import { useIndex, useSearchIndex } from "../../../services/index";
-import { sendDocumentToIndex } from "../engines/index/index";
+import { sendDocumentToIndex } from "../adapters/index/index";
 import { sendDocumentToSearchIndex } from "./sendToSearchIndex";
 import { hasFormatOfType } from "../../../lib/format-utils";
 import { brandingTransformer } from "../../../lib/branding/transformer";

@@ -169,7 +169,6 @@ export async function fireEngineCheckStatus(
       throw new UnsupportedFileError(successParse.data.pageError);
     }
 
-    logger.debug("Scrape succeeded!", { jobId });
     return successParse.data;
   } else if (processingParse.success) {
     throw new StillProcessingError(jobId);

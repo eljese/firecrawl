@@ -2,7 +2,7 @@ import { Document } from "../../../controllers/v1/types";
 import { Meta } from "..";
 import { logger } from "../../../lib/logger";
 import { parseMarkdown } from "../../../lib/html-to-markdown";
-import { smartScrape, SmartScrapeResult } from "../lib/smartScrape";
+import { smartScrape, SmartScrapeResult } from "./smartScrape";
 import { hasFormatOfType } from "../../../lib/format-utils";
 
 export async function performAgent(

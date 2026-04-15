@@ -1,6 +1,6 @@
 import { Document } from "../../../controllers/v2/types";
 import { Meta } from "..";
-import { extractAttributes } from "../lib/extractAttributes";
+import { extractAttributes } from "../lib/html/extractAttributes";
 import { hasFormatOfType } from "../../../lib/format-utils";
 
 /**

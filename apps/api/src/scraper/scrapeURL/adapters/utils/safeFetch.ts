@@ -6,7 +6,7 @@ import { interceptors } from "undici";
 import { CookieJar } from "tough-cookie";
 import { cookie } from "http-cookie-agent/undici";
 import IPAddr from "ipaddr.js";
-export class InsecureConnectionError extends Error {
+class InsecureConnectionError extends Error {
   constructor() {
     super("Connection violated security rules.");
   }

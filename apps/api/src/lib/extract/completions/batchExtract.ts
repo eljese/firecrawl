@@ -12,7 +12,7 @@ import {
 import { getModel } from "../../generic-ai";
 import { CostTracking, CostLimitExceededError } from "../../cost-tracking";
 import fs from "fs/promises";
-import { extractData } from "../../../scraper/scrapeURL/lib/extractSmartScrape";
+import { extractData } from "../../../scraper/scrapeURL/transformers/extractSmartScrape";
 import type { Logger } from "winston";
 
 type BatchExtractOptions = {

@@ -1,6 +1,6 @@
 import type { Meta } from "..";
 import type { Postprocessor } from ".";
-import type { EngineScrapeResult } from "../engines";
+import type { EngineScrapeResult } from "../adapters";
 
 export const youtubePostprocessor: Postprocessor = {
   name: "youtube",

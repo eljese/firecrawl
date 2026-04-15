@@ -99,6 +99,10 @@ const configSchema = z.object({
   FIRE_ENGINE_AB_URL: z.string().optional(),
   FIRE_ENGINE_AB_RATE: z.coerce.number().optional(),
   FIRE_ENGINE_AB_MODE: z.enum(["mirror", "split"]).default("mirror"),
+  FIRE_ENGINE_HTTP_GATEWAY_URL: z.string().optional(),
+
+  // Proxy API (fire-proxy service)
+  PROXY_API_URL: z.string().default("http://fire-proxy-api-service:3000"),
 
   // Indexer
   INDEXER_RABBITMQ_URL: z.string().optional(),

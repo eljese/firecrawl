@@ -1,4 +1,4 @@
-import { extractMetadata } from "../../scraper/scrapeURL/lib/extractMetadata";
+import { extractMetadata } from "../../scraper/scrapeURL/lib/html/extractMetadata";
 import { jest, describe, it, expect } from "@jest/globals";
 
 describe("Metadata concatenation", () => {

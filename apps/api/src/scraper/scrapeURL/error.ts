@@ -1,6 +1,6 @@
 import { ErrorCodes, TransportableError } from "../../lib/error";
 import { Meta } from ".";
-import { Engine, FeatureFlag } from "./engines";
+import { Engine, FeatureFlag } from "./adapters";
 import { isSelfHosted } from "../../lib/deployment";
 
 export class EngineError extends Error {
@@ -518,30 +518,6 @@ export class FEPageLoadFailed extends Error {
   }
 }
 
-export class EngineSnipedError extends Error {
-  name = "EngineSnipedError";
-
-  constructor() {
-    super("Engine got sniped");
-  }
-}
-
-export class EngineUnsuccessfulError extends Error {
-  name = "EngineUnsuccessfulError";
-
-  constructor(engine: Engine) {
-    super(`Engine ${engine} was unsuccessful`);
-  }
-}
-
-export class WaterfallNextEngineSignal extends Error {
-  name = "WaterfallNextEngineSignal";
-
-  constructor() {
-    super("Waterfall next engine");
-  }
-}
-
 export class ScrapeJobCancelledError extends TransportableError {
   constructor() {
     super(
@@ -564,14 +540,14 @@ export class ScrapeJobCancelledError extends TransportableError {
   }
 }
 
-export type ScrapeRetryLimitReason =
+type ScrapeRetryLimitReason =
   | "global"
   | "feature_toggle"
   | "feature_removal"
   | "pdf_antibot"
   | "document_antibot";
 
-export type ScrapeRetryStats = {
+type ScrapeRetryStats = {
   totalAttempts: number;
   addFeatureAttempts: number;
   removeFeatureAttempts: number;

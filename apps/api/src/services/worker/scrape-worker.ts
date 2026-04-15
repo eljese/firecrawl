@@ -82,7 +82,7 @@ import {
 } from "../../lib/otel-tracer";
 import { ScrapeUrlResponse } from "../../scraper/scrapeURL";
 import { logScrape } from "../logging/log_job";
-import { FeatureFlag } from "../../scraper/scrapeURL/engines";
+import { FeatureFlag } from "../../scraper/scrapeURL/adapters";
 
 configDotenv();
 

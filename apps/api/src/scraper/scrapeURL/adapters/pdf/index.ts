@@ -1,18 +1,12 @@
 import { Meta } from "../..";
 import { config } from "../../../../config";
-import { EngineScrapeResult } from "..";
-import { downloadFile, fetchFileToBuffer } from "../utils/downloadFile";
+import { EngineScrapeResult, Fetched } from "..";
 import { safeMarkdownToHtml } from "./markdownToHtml";
-import {
-  PDFAntibotError,
-  PDFInsufficientTimeError,
-  PDFOCRRequiredError,
-  PDFPrefetchFailed,
-  RemoveFeatureError,
-  EngineUnsuccessfulError,
-} from "../../error";
-import { open, readFile, unlink } from "node:fs/promises";
-import type { Response } from "undici";
+import { PDFInsufficientTimeError, PDFOCRRequiredError } from "../../error";
+import { readFile, unlink, writeFile } from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
+import { v7 as uuid } from "uuid";
 import { AbortManagerThrownError } from "../../lib/abortManager";
 import {
   shouldParsePDF,
@@ -32,7 +26,7 @@ import { scrapePDFWithRunPodMU } from "./runpodMU";
 import { scrapePDFWithFirePDF } from "./firePDF";
 import { scrapePDFWithParsePDF } from "./pdfParse";
 import { captureExceptionWithZdrCheck } from "../../../../services/sentry";
-import { isPdfBuffer, PDF_SNIFF_WINDOW } from "./pdfUtils";
+import { isPdfBuffer } from "./pdfUtils";
 import { comparePdfOutputs } from "./shadowComparison";
 
 /** Check if the PDF is eligible for Rust extraction, returning a rejection reason or null. */
@@ -47,105 +41,44 @@ function getIneligibleReason(
   return null;
 }
 
-export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
+export async function parsePdfBuffer(
+  meta: Meta,
+  fetched: Fetched,
+): Promise<EngineScrapeResult> {
+  if (!isPdfBuffer(fetched.buffer)) {
+    throw new Error("parsePdfBuffer called with non-PDF bytes");
+  }
+
   const shouldParse = shouldParsePDF(meta.options.parsers);
   const maxPages = getPDFMaxPages(meta.options.parsers);
   const mode: PDFMode = getPDFMode(meta.options.parsers);
 
   if (!shouldParse) {
-    if (meta.pdfPrefetch !== undefined && meta.pdfPrefetch !== null) {
-      const content = (await readFile(meta.pdfPrefetch.filePath)).toString(
-        "base64",
-      );
-      return {
-        url: meta.pdfPrefetch.url ?? meta.rewrittenUrl ?? meta.url,
-        statusCode: meta.pdfPrefetch.status,
-
-        html: content,
-        markdown: content,
-
-        contentType: "application/pdf",
-        proxyUsed: meta.pdfPrefetch.proxyUsed,
-      };
-    } else {
-      const file = await fetchFileToBuffer(
-        meta.rewrittenUrl ?? meta.url,
-        meta.options.skipTlsVerification,
-        {
-          headers: meta.options.headers,
-          signal: meta.abort.asSignal(),
-        },
-      );
-
-      if (!isPdfBuffer(file.buffer)) {
-        // downloaded content isn't a valid PDF
-        if (meta.pdfPrefetch === undefined) {
-          // for non-PDF URLs, this is expected, not anti-bot
-          if (!meta.featureFlags.has("pdf")) {
-            throw new EngineUnsuccessfulError("pdf");
-          } else {
-            throw new PDFAntibotError();
-          }
-        } else {
-          throw new PDFPrefetchFailed();
-        }
-      }
-
-      const content = file.buffer.toString("base64");
-      return {
-        url: file.response.url,
-        statusCode: file.response.status,
-
-        html: content,
-        markdown: content,
-
-        contentType: "application/pdf",
-        proxyUsed: "basic",
-      };
-    }
+    const content = fetched.buffer.toString("base64");
+    return {
+      url: fetched.url,
+      statusCode: fetched.status,
+      html: content,
+      markdown: content,
+      contentType: "application/pdf",
+      proxyUsed: fetched.proxyUsed ?? "basic",
+    };
   }
 
-  const { response, tempFilePath } =
-    meta.pdfPrefetch !== undefined && meta.pdfPrefetch !== null
-      ? { response: meta.pdfPrefetch, tempFilePath: meta.pdfPrefetch.filePath }
-      : await downloadFile(
-          meta.id,
-          meta.rewrittenUrl ?? meta.url,
-          meta.options.skipTlsVerification,
-          {
-            headers: meta.options.headers,
-            signal: meta.abort.asSignal(),
-          },
-        );
+  // The downstream native processors (processPdf/detectPdf/MinerU/parsePDF)
+  // all expect a file path, so write the buffer to a temp file once and
+  // clean up in finally. This is the only I/O side-effect of this function.
+  const tempFilePath = path.join(
+    os.tmpdir(),
+    `tempFile-${meta.id}--${uuid()}.pdf`,
+  );
+  await writeFile(tempFilePath, fetched.buffer);
+  const response = {
+    url: fetched.url,
+    status: fetched.status,
+  };
 
   try {
-    // Validate the downloaded file is actually a PDF by checking magic bytes
-    const header = Buffer.alloc(PDF_SNIFF_WINDOW);
-    const fh = await open(tempFilePath, "r");
-    let headerBytesRead: number;
-    try {
-      ({ bytesRead: headerBytesRead } = await fh.read(
-        header,
-        0,
-        PDF_SNIFF_WINDOW,
-        0,
-      ));
-    } finally {
-      await fh.close();
-    }
-
-    if (!isPdfBuffer(header.subarray(0, headerBytesRead))) {
-      if (meta.pdfPrefetch === undefined) {
-        if (!meta.featureFlags.has("pdf")) {
-          throw new EngineUnsuccessfulError("pdf");
-        } else {
-          throw new PDFAntibotError();
-        }
-      } else {
-        throw new PDFPrefetchFailed();
-      }
-    }
-
     let result: PDFProcessorResult | null = null;
     let effectivePageCount: number = 0;
     let metadataTitle: string | undefined;
@@ -388,10 +321,7 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
             effectivePageCount,
           );
         } catch (error) {
-          if (
-            error instanceof RemoveFeatureError ||
-            error instanceof AbortManagerThrownError
-          ) {
+          if (error instanceof AbortManagerThrownError) {
             throw error;
           }
           if (forceFirePDF) {
@@ -478,10 +408,7 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
             })();
           }
         } catch (error) {
-          if (
-            error instanceof RemoveFeatureError ||
-            error instanceof AbortManagerThrownError
-          ) {
+          if (error instanceof AbortManagerThrownError) {
             throw error;
           }
           meta.logger.warn(
@@ -524,7 +451,7 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
     }
 
     return {
-      url: response.url ?? meta.rewrittenUrl ?? meta.url,
+      url: response.url,
       statusCode: response.status,
       html: result?.html ?? "",
       markdown: result?.markdown ?? "",
@@ -534,7 +461,7 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
       },
 
       contentType: "application/pdf",
-      proxyUsed: "basic",
+      proxyUsed: fetched.proxyUsed ?? "basic",
     };
   } finally {
     // Always clean up temp file after we're done with it
@@ -548,8 +475,4 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
       });
     }
   }
-}
-
-export function pdfMaxReasonableTime(meta: Meta): number {
-  return 120000; // Infinity, really
 }

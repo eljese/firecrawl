@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { config } from "../../../config";
 import { logger as _logger } from "../../../lib/logger";
-import { robustFetch } from "./fetch";
+import { robustFetch } from "../lib/fetch";
 import fs from "fs/promises";
 import { configDotenv } from "dotenv";
 import {

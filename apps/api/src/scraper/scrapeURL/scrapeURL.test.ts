@@ -5,7 +5,7 @@ config.ENV = "test";
 
 import { scrapeURL } from ".";
 import { scrapeOptions } from "../../controllers/v2/types";
-import { Engine } from "./engines";
+import { Engine } from "./adapters";
 import { CostTracking } from "../../lib/cost-tracking";
 
 // Mock parseMarkdown but delegate to real implementation for other tests
@@ -22,8 +22,6 @@ import { parseMarkdown } from "../../lib/html-to-markdown";
 const testEngines: (Engine | undefined)[] = [
   undefined,
   "fire-engine;chrome-cdp",
-  "fire-engine;tlsclient",
-  "fetch",
 ];
 
 const testEnginesScreenshot: (Engine | undefined)[] = [

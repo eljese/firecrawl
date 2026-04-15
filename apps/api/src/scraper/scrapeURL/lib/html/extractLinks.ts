@@ -1,6 +1,6 @@
 // TODO: refactor
 import { load } from "cheerio"; // rustified
-import { logger } from "../../../lib/logger";
+import { logger } from "../../../../lib/logger";
 import {
   extractLinks as _extractLinks,
   extractBaseHref as _extractBaseHref,

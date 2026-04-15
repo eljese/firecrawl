@@ -6,7 +6,7 @@ import {
 import { buildDocument } from "../build-document";
 import { Document, TokenUsage } from "../../../controllers/v1/types";
 import { getModel } from "../../../lib/generic-ai";
-import { extractData } from "../../../scraper/scrapeURL/lib/extractSmartScrape";
+import { extractData } from "../../../scraper/scrapeURL/transformers/extractSmartScrape";
 import { CostTracking } from "../../cost-tracking";
 
 export async function singleAnswerCompletion({

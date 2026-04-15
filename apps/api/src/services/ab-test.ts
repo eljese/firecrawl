@@ -5,8 +5,7 @@ import { config } from "../config";
 import {
   FireEngineScrapeRequestChromeCDP,
   FireEngineScrapeRequestCommon,
-  FireEngineScrapeRequestTLSClient,
-} from "../scraper/scrapeURL/engines/fire-engine/scrape";
+} from "../scraper/scrapeURL/adapters/fire-engine/scrape";
 import { getDocFromGCS } from "../lib/gcs-jobs";
 import { MirrorResult, FireEngineResponse } from "./ab-test-comparison";
 
@@ -78,8 +77,7 @@ type ABTestDecision =
   | { mode: "split"; baseUrl: string };
 
 export function abTestFireEngine(
-  feRequest: FireEngineScrapeRequestCommon &
-    (FireEngineScrapeRequestChromeCDP | FireEngineScrapeRequestTLSClient),
+  feRequest: FireEngineScrapeRequestCommon & FireEngineScrapeRequestChromeCDP,
 ): ABTestDecision {
   const abLogger = _logger.child({ method: "ABTestFireEngine" });
 

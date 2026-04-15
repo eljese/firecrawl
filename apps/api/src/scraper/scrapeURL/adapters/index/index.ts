@@ -46,10 +46,6 @@ export async function sendDocumentToIndex(meta: Meta, document: Document) {
       }
       return false;
     }) &&
-    (meta.internalOptions.teamId === "sitemap" ||
-      (meta.winnerEngine !== "fire-engine;tlsclient" &&
-        meta.winnerEngine !== "fire-engine;tlsclient;stealth" &&
-        meta.winnerEngine !== "fetch")) &&
     !meta.featureFlags.has("actions") &&
     !hasCustomScreenshotSettings &&
     (meta.options.headers === undefined ||
@@ -204,66 +200,71 @@ export async function sendDocumentToIndex(meta: Meta, document: Document) {
   return document;
 }
 
-const errorCountToRegister = 3;
+const DEFAULT_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
+const MAX_AGE_LOOKUP_TIMEOUT_MS = 200;
+const ERROR_ROWS_BEFORE_FALLBACK = 3;
+
+/**
+ * Resolve the effective maxAge. User-provided value wins; otherwise query the
+ * per-domain default from the index, falling back to 2 days if the lookup is
+ * unavailable or slow.
+ */
+async function resolveMaxAge(meta: Meta): Promise<number> {
+  if (meta.options.maxAge !== undefined) return meta.options.maxAge;
+
+  const domainSplitsHash = generateDomainSplits(new URL(meta.url).hostname).map(
+    x => hashURL(x),
+  );
+  if (
+    domainSplitsHash.length === 0 ||
+    config.FIRECRAWL_INDEX_WRITE_ONLY ||
+    config.USE_DB_AUTHENTICATION !== true
+  ) {
+    return DEFAULT_MAX_AGE_MS;
+  }
+
+  try {
+    const lookup = index_supabase_service
+      .rpc("query_max_age", {
+        i_domain_hash: domainSplitsHash[domainSplitsHash.length - 1],
+      })
+      .then(({ data, error }) => {
+        if (error || !data || data.length === 0) {
+          meta.logger.warn("Failed to get max age from DB", { error });
+          return DEFAULT_MAX_AGE_MS;
+        }
+        return data[0].max_age ?? DEFAULT_MAX_AGE_MS;
+      });
+    const timeout = new Promise<number>(resolve =>
+      setTimeout(() => resolve(DEFAULT_MAX_AGE_MS), MAX_AGE_LOOKUP_TIMEOUT_MS),
+    );
+    return (await Promise.race([lookup, timeout])) as number;
+  } catch (error) {
+    meta.logger.warn("Failed to get max age from DB", { error });
+    return DEFAULT_MAX_AGE_MS;
+  }
+}
+
+/**
+ * Pick the most relevant row returned by `index_get_recent_4`. Prefer the
+ * newest 2xx entry, but if there are fewer than N error rows before it, we
+ * fall back to the absolute newest so the caller sees the latest state.
+ */
+function pickRow<T extends { status: number }>(rows: T[]): T | null {
+  if (rows.length === 0) return null;
+  const newest2xx = rows.findIndex(r => r.status >= 200 && r.status < 300);
+  if (newest2xx === -1 || newest2xx >= ERROR_ROWS_BEFORE_FALLBACK)
+    return rows[0];
+  return rows[newest2xx];
+}
 
 export async function scrapeURLWithIndex(
   meta: Meta,
 ): Promise<EngineScrapeResult> {
-  const startTime = Date.now();
   const normalizedURL = normalizeURLForIndex(meta.url);
   const urlHash = hashURL(normalizedURL);
 
-  let maxAge: number;
-  if (meta.options.maxAge !== undefined) {
-    maxAge = meta.options.maxAge;
-  } else {
-    const domainSplitsHash = generateDomainSplits(
-      new URL(meta.url).hostname,
-    ).map(x => hashURL(x));
-    const level = domainSplitsHash.length - 1;
-
-    if (
-      domainSplitsHash.length === 0 ||
-      config.FIRECRAWL_INDEX_WRITE_ONLY ||
-      config.USE_DB_AUTHENTICATION !== true
-    ) {
-      maxAge = 2 * 24 * 60 * 60 * 1000; // 2 days
-    } else {
-      try {
-        maxAge = await Promise.race([
-          (async () => {
-            const { data, error } = await index_supabase_service.rpc(
-              "query_max_age",
-              {
-                i_domain_hash: domainSplitsHash[level],
-              },
-            );
-
-            if (error || !data || data.length === 0) {
-              meta.logger.warn("Failed to get max age from DB", {
-                error,
-              });
-              return 2 * 24 * 60 * 60 * 1000; // 2 days
-            }
-
-            return data[0].max_age ?? 2 * 24 * 60 * 60 * 1000; // 2 days
-          })(),
-          new Promise(resolve =>
-            setTimeout(() => {
-              resolve(2 * 24 * 60 * 60 * 1000); // 2 days
-            }, 200),
-          ),
-        ]);
-      } catch (e) {
-        meta.logger.warn("Failed to get max age from DB", {
-          error: e,
-        });
-        maxAge = 2 * 24 * 60 * 60 * 1000; // 2 days
-      }
-    }
-  }
-
-  const checkpoint1 = Date.now();
+  const maxAge = await resolveMaxAge(meta);
 
   const { data, error } = await index_supabase_service.rpc(
     "index_get_recent_4",
@@ -293,93 +294,40 @@ export async function scrapeURLWithIndex(
     });
   }
 
-  let selectedRow: {
+  const selectedRow = pickRow<{
     id: string;
     created_at: string;
     status: number;
-  } | null = null;
-
-  if (data.length > 0) {
-    const newest200Index = data.findIndex(
-      x => x.status >= 200 && x.status < 300,
-    );
-    // If the newest 200 index is further back than the allowed error count, we should display the errored index entry
-    if (newest200Index >= errorCountToRegister || newest200Index === -1) {
-      selectedRow = data[0];
-    } else {
-      selectedRow = data[newest200Index];
-    }
-  }
-
-  if (selectedRow === null || selectedRow === undefined) {
-    meta.logger.debug("Index metrics", {
-      module: "index/metrics",
-      hit: false,
-      maxAge,
-      dynamicMaxAge: meta.options.maxAge === undefined,
-      timingsFull: Date.now() - startTime,
-      timingsMaxAge: checkpoint1 - startTime,
-      timingsSupa: Date.now() - checkpoint1,
-    });
-
-    if (meta.internalOptions.agentIndexOnly) {
-      throw new AgentIndexOnlyError();
-    }
-
-    // when minAge is specified, don't waterfall to other engines
-    if (meta.options.minAge !== undefined) {
-      throw new NoCachedDataError();
-    }
-
+  }>(data);
+  if (!selectedRow) {
+    if (meta.internalOptions.agentIndexOnly) throw new AgentIndexOnlyError();
+    // minAge callers opted out of live scraping — don't fall through.
+    if (meta.options.minAge !== undefined) throw new NoCachedDataError();
     throw new IndexMissError();
   }
 
-  const checkpoint2 = Date.now();
-
-  const id = selectedRow.id;
-
   const doc = await getIndexFromGCS(
-    id + ".json",
+    selectedRow.id + ".json",
     meta.logger.child({ module: "index", method: "getIndexFromGCS" }),
   );
   if (!doc) {
     meta.logger.warn("Index document not found in GCS", {
-      indexDocumentId: id,
+      indexDocumentId: selectedRow.id,
     });
     throw new EngineError("Document not found in GCS");
   }
 
-  // Check if the cached content is a PDF base64 (starts with JVBERi)
-  const isCachedPdfBase64 = doc.html && doc.html.startsWith("JVBERi");
-
-  // If the cached content is base64 PDF but we want parsed PDF (parsePDF:true or default)
-  if (isCachedPdfBase64 && shouldParsePDF(meta.options.parsers)) {
-    // Cached content is unparsed PDF, but we want parsed - report cache miss
-    throw new IndexMissError();
-  }
-
-  // If the cached content is NOT base64 PDF but we want unparsed PDF (parsePDF:false)
-  if (!isCachedPdfBase64 && !shouldParsePDF(meta.options.parsers)) {
-    // Check if URL looks like a PDF
-    const isPdfUrl =
-      meta.url.toLowerCase().endsWith(".pdf") || meta.url.includes(".pdf?");
-    if (isPdfUrl) {
-      // This is likely a parsed PDF cached, but we want unparsed - report cache miss
+  // Cache/parse flavor consistency: if the caller wants a (un)parsed PDF but
+  // the cached entry is the opposite flavor, treat as a miss.
+  const isCachedPdfBase64 = !!doc.html && doc.html.startsWith("JVBERi");
+  const wantParsedPdf = shouldParsePDF(meta.options.parsers);
+  if (isCachedPdfBase64 && wantParsedPdf) throw new IndexMissError();
+  if (!isCachedPdfBase64 && !wantParsedPdf) {
+    const lowerUrl = meta.url.toLowerCase();
+    if (lowerUrl.endsWith(".pdf") || lowerUrl.includes(".pdf?")) {
       throw new IndexMissError();
     }
   }
-
-  meta.logger.debug("Index metrics", {
-    module: "index/metrics",
-    hit: true,
-    age: Date.now() - new Date(selectedRow.created_at).getTime(),
-    maxAge,
-    dynamicMaxAge: meta.options.maxAge === undefined,
-    timingsFull: Date.now() - startTime,
-    timingsMaxAge: checkpoint1 - startTime,
-    timingsSupa: checkpoint2 - checkpoint1,
-    timingsGCS: Date.now() - checkpoint2,
-  });
 
   return {
     url: doc.url,
@@ -389,24 +337,10 @@ export async function scrapeURLWithIndex(
     screenshot: doc.screenshot,
     pdfMetadata:
       doc.pdfMetadata ??
-      (doc.numPages !== undefined
-        ? {
-            // backwards-compatible shim of pdfMetadata without title
-            numPages: doc.numPages,
-          }
-        : undefined),
+      (doc.numPages !== undefined ? { numPages: doc.numPages } : undefined),
     contentType: doc.contentType,
-
-    cacheInfo: {
-      created_at: new Date(selectedRow.created_at),
-    },
-
+    cacheInfo: { created_at: new Date(selectedRow.created_at) },
     postprocessorsUsed: doc.postprocessorsUsed,
-
     proxyUsed: doc.proxyUsed ?? "basic",
   };
-}
-
-export function indexMaxReasonableTime(meta: Meta): number {
-  return 1500;
 }

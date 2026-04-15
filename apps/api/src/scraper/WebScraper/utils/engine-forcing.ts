@@ -1,6 +1,6 @@
 import { configDotenv } from "dotenv";
 import { parse } from "tldts";
-import { Engine } from "../../scrapeURL/engines";
+import { Engine } from "../../scrapeURL/adapters";
 import { logger } from "../../../lib/logger";
 
 import { config } from "../../../config";

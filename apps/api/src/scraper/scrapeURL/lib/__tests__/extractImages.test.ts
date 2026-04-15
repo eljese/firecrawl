@@ -1,4 +1,4 @@
-import { extractImages } from "../extractImages";
+import { extractImages } from "../html/extractImages";
 
 describe("extractImages", () => {
   const baseUrl = "https://example.com/page.html";

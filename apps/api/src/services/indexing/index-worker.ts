@@ -41,7 +41,6 @@ import { withSpan, setSpanAttributes } from "../../lib/otel-tracer";
 import { crawlGroup } from "../worker/nuq";
 import { getACUCTeam } from "../../controllers/auth";
 import { supabase_service } from "../supabase";
-import { processEngpickerJob } from "../../lib/engpicker";
 import { logRequest } from "../logging/log_job";
 
 const workerLockDuration = config.WORKER_LOCK_DURATION;
@@ -90,8 +89,7 @@ const processBillingJobInternal = async (token: string, job: Job) => {
         is_extract,
         api_key_id,
         autumnTrackInRequest,
-      } =
-        job.data;
+      } = job.data;
 
       logger.info(`Adding team ${team_id} billing operation to batch queue`, {
         credits,
@@ -769,22 +767,6 @@ const BROWSER_ACTIVITY_INSERT_INTERVAL = 10000;
     5 * 60 * 1000,
   );
 
-  const engpickerPromise = (async () => {
-    if (config.DISABLE_ENGPICKER) {
-      logger.info("Engpicker is disabled, skipping");
-      return;
-    }
-
-    while (!isShuttingDown) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      try {
-        await processEngpickerJob();
-      } catch (e) {
-        logger.error("Error processing engpicker job", { error: e });
-      }
-    }
-  })();
-
   // Search indexing is now handled by separate search service
   // The search service has its own worker that processes the queue
   // This worker no longer needs to process search index jobs
@@ -807,11 +789,7 @@ const BROWSER_ACTIVITY_INSERT_INTERVAL = 10000;
   }
 
   // Wait for all workers to complete (which should only happen on shutdown)
-  await Promise.all([
-    billingWorkerPromise,
-    precrawlWorkerPromise,
-    engpickerPromise,
-  ]);
+  await Promise.all([billingWorkerPromise, precrawlWorkerPromise]);
 
   clearInterval(indexInserterInterval);
   clearInterval(webhookInserterInterval);

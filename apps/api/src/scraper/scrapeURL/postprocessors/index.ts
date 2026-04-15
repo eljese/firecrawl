@@ -1,5 +1,5 @@
 import { Meta } from "..";
-import { EngineScrapeResult } from "../engines";
+import { EngineScrapeResult } from "../adapters";
 import { youtubePostprocessor } from "./youtube";
 
 export interface Postprocessor {
