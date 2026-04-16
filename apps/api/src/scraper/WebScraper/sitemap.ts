@@ -17,6 +17,7 @@ import {
 import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
 import { fetchFileToBuffer } from "../scrapeURL/adapters/utils/downloadFile";
+import { httpGateway, httpGatewayEnabled } from "../../lib/http-gateway";
 import { useIndex } from "../../services";
 
 const useFireEngine =
@@ -66,9 +67,9 @@ export async function getLinksFromSitemap(
     const isGzip = sitemapUrl.toLowerCase().endsWith(".gz");
     if (isGzip) {
       try {
-        const { buffer } = await fetchFileToBuffer(sitemapUrl, false, {
-          headers,
-        });
+        const { buffer } = httpGatewayEnabled()
+          ? await httpGateway(sitemapUrl, { headers })
+          : await fetchFileToBuffer(sitemapUrl, false, { headers });
         const decompressed = await gunzipAsync(buffer);
         content = decompressed.toString("utf-8");
       } catch (error) {

@@ -60,20 +60,3 @@ export async function fetchProxy(
     return undefined;
   }
 }
-
-/**
- * Convert a `host:port[:user:pass]` proxy string into the `http://user:pass@host:port`
- * URL format expected by the http-gateway forward endpoint.
- */
-export function proxyToUrl(proxy: string): string {
-  const parts = proxy.split(":");
-  if (parts.length >= 4) {
-    const [host, port, user, pass] = parts;
-    return `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
-  }
-  if (parts.length >= 2) {
-    const [host, port] = parts;
-    return `http://${host}:${port}`;
-  }
-  throw new Error(`Invalid proxy format: ${proxy}`);
-}

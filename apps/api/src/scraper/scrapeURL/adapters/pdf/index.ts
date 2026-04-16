@@ -26,7 +26,7 @@ import { scrapePDFWithRunPodMU } from "./runpodMU";
 import { scrapePDFWithFirePDF } from "./firePDF";
 import { scrapePDFWithParsePDF } from "./pdfParse";
 import { captureExceptionWithZdrCheck } from "../../../../services/sentry";
-import { isPdfBuffer } from "./pdfUtils";
+import { isPdf } from "./pdfUtils";
 import { comparePdfOutputs } from "./shadowComparison";
 
 /** Check if the PDF is eligible for Rust extraction, returning a rejection reason or null. */
@@ -45,7 +45,7 @@ export async function parsePdfBuffer(
   meta: Meta,
   fetched: Fetched,
 ): Promise<EngineScrapeResult> {
-  if (!isPdfBuffer(fetched.buffer)) {
+  if (!isPdf(fetched)) {
     throw new Error("parsePdfBuffer called with non-PDF bytes");
   }
 

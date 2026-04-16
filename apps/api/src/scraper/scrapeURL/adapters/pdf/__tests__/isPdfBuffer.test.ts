@@ -1,6 +1,9 @@
-import { isPdfBuffer } from "../pdfUtils";
+import type { Fetched } from "../..";
+import { isPdf } from "../pdfUtils";
 
-describe("isPdfBuffer", () => {
+const isPdfBuffer = (buffer: Buffer) => isPdf({ buffer } as Fetched);
+
+describe("isPdf", () => {
   it("detects a standard PDF-1.4 header", () => {
     const buf = Buffer.from("%PDF-1.4 rest of file...");
     expect(isPdfBuffer(buf)).toBe(true);
