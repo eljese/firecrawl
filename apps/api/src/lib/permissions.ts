@@ -52,8 +52,7 @@ export function checkPermissions(
   const customAgentMode = getCustomRobotsAgent(flags);
   if (
     request.crawlerOptions?.robotsUserAgent &&
-    customAgentMode !== "allowed" &&
-    customAgentMode !== "forced"
+    customAgentMode !== "allowed"
   ) {
     return {
       error: `The robotsUserAgent parameter is an enterprise feature. Contact ${SUPPORT_EMAIL} to explore whether it can be enabled for your team.`,
