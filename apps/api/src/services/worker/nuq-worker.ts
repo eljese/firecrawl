@@ -10,18 +10,14 @@ import { register } from "prom-client";
 import Express from "express";
 import { _ } from "ajv";
 import { initializeBlocklist } from "../../scraper/WebScraper/utils/blocklist";
-import { initializeEngineForcing } from "../../scraper/WebScraper/utils/engine-forcing";
 
 (async () => {
   setSentryServiceTag("nuq-worker");
 
   try {
     await initializeBlocklist();
-    initializeEngineForcing();
   } catch (error) {
-    _logger.error("Failed to initialize blocklist and engine forcing", {
-      error,
-    });
+    _logger.error("Failed to initialize blocklist", { error });
     process.exit(1);
   }
 

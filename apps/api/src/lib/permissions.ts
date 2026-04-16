@@ -19,7 +19,11 @@ export function checkPermissions(
 ): { error?: string } {
   // zdr perms — scrapeZDR must be 'allowed' or 'forced' for request-scoped ZDR
   const scrapeMode = getScrapeZDR(flags);
-  if (request.zeroDataRetention && scrapeMode !== "allowed" && scrapeMode !== "forced") {
+  if (
+    request.zeroDataRetention &&
+    scrapeMode !== "allowed" &&
+    scrapeMode !== "forced"
+  ) {
     return {
       error: `Zero Data Retention (ZDR) is not enabled for your team. Contact ${SUPPORT_EMAIL} to enable this feature.`,
     };

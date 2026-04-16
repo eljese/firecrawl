@@ -3,7 +3,6 @@ import { config } from "../config";
 import { Logger } from "winston";
 import { ScrapeOptions, scrapeOptions } from "../controllers/v2/types";
 import { scrapeURL } from "../scraper/scrapeURL";
-import { Engine } from "../scraper/scrapeURL/adapters";
 import { CostTracking } from "./cost-tracking";
 import { useIndex } from "../services";
 
@@ -36,16 +35,6 @@ export async function fetchRobotsTxt(
   const urlObj = new URL(url);
   const robotsTxtUrl = `${urlObj.protocol}//${urlObj.host}/robots.txt`;
 
-  const forceEngine: Engine[] = [
-    ...(useIndex ? ["index" as const] : []),
-    ...(useFireEngine
-      ? [
-          "fire-engine;chrome-cdp" as const,
-          "fire-engine;chrome-cdp;stealth" as const,
-        ]
-      : []),
-  ];
-
   let content: string = "";
   const response = await scrapeURL(
     "robots-txt;" + scrapeId,
@@ -57,8 +46,6 @@ export async function fetchRobotsTxt(
       ...(location ? { location } : {}),
     }),
     {
-      forceEngine,
-      v0DisableJsDom: true,
       externalAbort: abort
         ? {
             signal: abort,

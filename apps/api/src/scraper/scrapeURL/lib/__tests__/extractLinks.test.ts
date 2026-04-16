@@ -1,4 +1,4 @@
-import { extractLinks } from "../html/extractLinks";
+import { extractLinks } from "../html/extract-links";
 
 describe("extractLinks integration", () => {
   it("should resolve relative links with base href correctly", async () => {

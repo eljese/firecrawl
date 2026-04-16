@@ -43,7 +43,10 @@ describe("Query format", () => {
       const response = await scrape(
         {
           url: "https://firecrawl.dev",
-          formats: ["markdown", { type: "query", prompt: "What is Firecrawl?" }],
+          formats: [
+            "markdown",
+            { type: "query", prompt: "What is Firecrawl?" },
+          ],
         },
         identity,
       );

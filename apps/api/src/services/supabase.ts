@@ -96,4 +96,3 @@ export const supabase_rr_service: SupabaseClient = new Proxy(serv, {
     return Reflect.get(client, prop, receiver);
   },
 }) as unknown as SupabaseClient;
-

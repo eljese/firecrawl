@@ -1395,7 +1395,6 @@ function fromV0CrawlerOptions(
       delay: x.delay,
     }),
     internalOptions: {
-      v0CrawlOnlyUrls: x.returnOnlyUrls,
       teamId,
     },
   };
@@ -1459,7 +1458,6 @@ export function fromV0ScrapeOptions(
     }),
     internalOptions: {
       atsv: pageOptions.atsv,
-      v0DisableJsDom: pageOptions.disableJsDom,
       teamId,
       ...(extractorOptions !== undefined &&
       extractorOptions.mode.includes("llm-extraction")

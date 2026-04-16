@@ -1,70 +1,9 @@
 import { ErrorCodes, TransportableError } from "../../lib/error";
-import { Meta } from ".";
-import { Engine, FeatureFlag } from "./adapters";
 import { isSelfHosted } from "../../lib/deployment";
 
 export class EngineError extends Error {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
-  }
-}
-
-export class NoEnginesLeftError extends TransportableError {
-  public fallbackList: Engine[];
-
-  constructor(fallbackList: Engine[]) {
-    const enginesTriedStr = fallbackList.join(", ");
-    const message = isSelfHosted()
-      ? `All scraping engines failed to retrieve content from this URL. Engines tried: [${enginesTriedStr}]. This usually happens when: (1) The URL is invalid or the page doesn't exist (404), (2) The website is blocking automated access, (3) The website is down or unreachable, (4) The page requires authentication. Double check the URL is correct and accessible in a browser. Check your server logs for more detailed error information from each engine.`
-      : `All scraping engines failed to retrieve content from this URL. Engines tried: [${enginesTriedStr}]. This usually happens when: (1) The URL is invalid or the page doesn't exist (404), (2) The website is blocking automated access, (3) The website is down or unreachable, (4) The page requires authentication. Double check the URL is correct and accessible in a browser. If the issue persists, contact us at help@firecrawl.com with your request ID for investigation.`;
-
-    super("SCRAPE_ALL_ENGINES_FAILED", message);
-    this.fallbackList = fallbackList;
-  }
-
-  serialize() {
-    return {
-      ...super.serialize(),
-      fallbackList: this.fallbackList,
-    };
-  }
-
-  static deserialize(
-    _: ErrorCodes,
-    data: ReturnType<typeof this.prototype.serialize>,
-  ) {
-    const x = new NoEnginesLeftError(data.fallbackList);
-    x.stack = data.stack;
-    return x;
-  }
-}
-
-export class AddFeatureError extends Error {
-  public featureFlags: FeatureFlag[];
-  public pdfPrefetch: Meta["pdfPrefetch"];
-  public documentPrefetch: Meta["documentPrefetch"];
-
-  constructor(
-    featureFlags: FeatureFlag[],
-    pdfPrefetch?: Meta["pdfPrefetch"],
-    documentPrefetch?: Meta["documentPrefetch"],
-  ) {
-    super("New feature flags have been discovered: " + featureFlags.join(", "));
-    this.featureFlags = featureFlags;
-    this.pdfPrefetch = pdfPrefetch;
-    this.documentPrefetch = documentPrefetch;
-  }
-}
-
-export class RemoveFeatureError extends Error {
-  public featureFlags: FeatureFlag[];
-
-  constructor(featureFlags: FeatureFlag[]) {
-    super(
-      "Incorrect feature flags have been discovered: " +
-        featureFlags.join(", "),
-    );
-    this.featureFlags = featureFlags;
   }
 }
 
@@ -535,50 +474,6 @@ export class ScrapeJobCancelledError extends TransportableError {
     data: ReturnType<typeof this.prototype.serialize>,
   ) {
     const x = new ScrapeJobCancelledError();
-    x.stack = data.stack;
-    return x;
-  }
-}
-
-type ScrapeRetryLimitReason =
-  | "global"
-  | "feature_toggle"
-  | "feature_removal"
-  | "pdf_antibot"
-  | "document_antibot";
-
-type ScrapeRetryStats = {
-  totalAttempts: number;
-  addFeatureAttempts: number;
-  removeFeatureAttempts: number;
-  pdfAntibotAttempts: number;
-  documentAntibotAttempts: number;
-};
-
-export class ScrapeRetryLimitError extends TransportableError {
-  constructor(
-    public reason: ScrapeRetryLimitReason,
-    public stats: ScrapeRetryStats,
-  ) {
-    super(
-      "SCRAPE_RETRY_LIMIT",
-      `Scrape aborted after exceeding retry limit (${reason}).`,
-    );
-  }
-
-  serialize() {
-    return {
-      ...super.serialize(),
-      reason: this.reason,
-      stats: this.stats,
-    };
-  }
-
-  static deserialize(
-    _: ErrorCodes,
-    data: ReturnType<typeof this.prototype.serialize>,
-  ) {
-    const x = new ScrapeRetryLimitError(data.reason, data.stats);
     x.stack = data.stack;
     return x;
   }

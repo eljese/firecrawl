@@ -111,7 +111,7 @@ export async function expectCrawlIsCleanedUp(crawlId: string) {
 
   expect(requestError).toBeFalsy();
   expect(requestData).toHaveLength(1);
-  
+
   if (requestData && requestData.length === 1) {
     const record = requestData[0];
     expect(record.url).not.toContain("://"); // no url stored
@@ -144,7 +144,7 @@ export async function expectBatchScrapeIsCleanedUp(batchScrapeId: string) {
 
   expect(requestError).toBeFalsy();
   expect(requestData).toHaveLength(1);
-  
+
   if (requestData && requestData.length === 1) {
     const record = requestData[0];
     expect(record.url).not.toContain("://"); // no url stored
@@ -152,11 +152,12 @@ export async function expectBatchScrapeIsCleanedUp(batchScrapeId: string) {
     expect(record.dr_clean_by).not.toBeNull();
   }
 
-  const { data: batchScrapeData, error: batchScrapeError } = await supabase_service
-    .from("batch_scrapes")
-    .select("*")
-    .eq("id", batchScrapeId)
-    .limit(1);
+  const { data: batchScrapeData, error: batchScrapeError } =
+    await supabase_service
+      .from("batch_scrapes")
+      .select("*")
+      .eq("id", batchScrapeId)
+      .limit(1);
 
   expect(batchScrapeError).toBeFalsy();
   expect(batchScrapeData).toHaveLength(1);

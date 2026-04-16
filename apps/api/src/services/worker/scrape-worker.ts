@@ -11,7 +11,7 @@ import {
   pushConcurrencyLimitActiveJob,
 } from "../../lib/concurrency-limit";
 import { addJobPriority, deleteJobPriority } from "../../lib/job-priority";
-import { cacheableLookup } from "../../scraper/scrapeURL/lib/cacheableLookup";
+import { cacheableLookup } from "../../scraper/scrapeURL/lib/cacheable-lookup";
 import { v7 as uuidv7 } from "uuid";
 import {
   addCrawlJob,
@@ -82,7 +82,7 @@ import {
 } from "../../lib/otel-tracer";
 import { ScrapeUrlResponse } from "../../scraper/scrapeURL";
 import { logScrape } from "../logging/log_job";
-import { FeatureFlag } from "../../scraper/scrapeURL/adapters";
+import { FeatureFlag } from "../../scraper/scrapeURL/types";
 
 configDotenv();
 

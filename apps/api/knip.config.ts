@@ -9,7 +9,7 @@ const config: KnipConfig = {
   },
   ignore: [
     "native/**",
-    "src/scraper/scrapeURL/adapters/fire-engine/branding-script/**",
+    "src/scraper/scrapeURL/fetch/branding-script/**",
     // Legacy auto-recharge files — kept but disabled (Autumn handles auto-recharge now)
     "src/services/billing/auto_charge.ts",
     "src/services/billing/issue_credits.ts",

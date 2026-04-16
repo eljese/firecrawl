@@ -51,7 +51,8 @@ export async function batchScrapeController(
   }
 
   const zeroDataRetention =
-    getScrapeZDR(req.acuc?.flags) === "forced" || (req.body.zeroDataRetention ?? false);
+    getScrapeZDR(req.acuc?.flags) === "forced" ||
+    (req.body.zeroDataRetention ?? false);
 
   if (
     req.body.__agentInterop &&

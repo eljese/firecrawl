@@ -223,7 +223,6 @@ export async function processBillingBatch() {
             },
           });
         }
-
       } catch (error) {
         await refundRequestTrackedCredits(group);
         logger.error(`❌ Failed to bill team ${group.team_id}`, {

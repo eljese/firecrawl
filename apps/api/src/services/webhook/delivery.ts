@@ -5,7 +5,7 @@ import { logger as _logger, logger } from "../../lib/logger";
 import {
   getSecureDispatcherNoCookies,
   isIPPrivate,
-} from "../../scraper/scrapeURL/adapters/utils/safeFetch";
+} from "../../lib/safe-fetch";
 import type {
   WebhookConfig,
   WebhookEvent,

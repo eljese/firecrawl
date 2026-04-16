@@ -2,11 +2,12 @@ import { Logger } from "winston";
 import { z, ZodError } from "zod";
 import * as Sentry from "@sentry/node";
 import { MockState, saveMock } from "./mock";
-import { fireEngineURL } from "../adapters/fire-engine/scrape";
+import { config } from "../../../config";
+const fireEngineURL = config.FIRE_ENGINE_BETA_URL ?? "<mock-fire-engine-url>";
 import { fetch, Response, FormData, Agent } from "undici";
-import { cacheableLookup } from "./cacheableLookup";
+import { cacheableLookup } from "./cacheable-lookup";
 import dns from "dns";
-import { AbortManagerThrownError } from "./abortManager";
+import { AbortManagerThrownError } from "./abort-manager";
 
 type RobustFetchParams<Schema extends z.Schema<any>> = {
   url: string;

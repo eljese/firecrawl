@@ -1,7 +1,7 @@
 import {
   parseWikimediaUrl,
   isWikimediaUrl,
-} from "../../scraper/scrapeURL/adapters/wikipedia";
+} from "../../scraper/scrapeURL/fetch/wikipedia";
 
 describe("Wikipedia URL parser", () => {
   describe("parseWikimediaUrl", () => {

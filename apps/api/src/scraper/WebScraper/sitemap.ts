@@ -7,7 +7,6 @@ import type { Logger } from "winston";
 import { CostTracking } from "../../lib/cost-tracking";
 import { ScrapeJobTimeoutError } from "../../lib/error";
 import type { ScrapeOptions } from "../../controllers/v2/types";
-import { Engine } from "../scrapeURL/adapters";
 import {
   ParsedSitemap,
   parseSitemapXml,
@@ -16,7 +15,7 @@ import {
 } from "@mendable/firecrawl-rs";
 import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
-import { fetchFileToBuffer } from "../scrapeURL/adapters/utils/downloadFile";
+import { fetchFileToBuffer } from "../../lib/download-file";
 import { httpGateway, httpGatewayEnabled } from "../../lib/http-gateway";
 import { useIndex } from "../../services";
 
@@ -81,16 +80,6 @@ export async function getLinksFromSitemap(
       }
     } else {
       try {
-        const forceEngine: Engine[] = [
-          ...(maxAge > 0 && useIndex ? ["index" as const] : []),
-          ...(mode === "fire-engine" && useFireEngine
-            ? [
-                "fire-engine;chrome-cdp" as const,
-                "fire-engine;chrome-cdp;stealth" as const,
-              ]
-            : []),
-        ];
-
         const response = await scrapeURL(
           "sitemap;" + crawlId,
           sitemapUrl,
@@ -102,8 +91,6 @@ export async function getLinksFromSitemap(
             ...(headers ? { headers } : {}),
           }),
           {
-            forceEngine,
-            v0DisableJsDom: true,
             externalAbort: abort
               ? {
                   signal: abort,

@@ -1411,7 +1411,6 @@ function fromLegacyCrawlerOptions(
       delay: x.delay,
     }),
     internalOptions: {
-      v0CrawlOnlyUrls: x.returnOnlyUrls,
       teamId,
     },
   };
@@ -1476,7 +1475,6 @@ export function fromLegacyScrapeOptions(
     }),
     internalOptions: {
       atsv: pageOptions.atsv,
-      v0DisableJsDom: pageOptions.disableJsDom,
       teamId,
     },
     // TODO: fallback, fetchPageContent, replaceAllPathsWithAbsolutePaths, includeLinks
@@ -1487,9 +1485,7 @@ export function toLegacyDocument(
   document: Document,
   internalOptions: InternalOptions,
 ): V0Document | { url: string } {
-  if (internalOptions.v0CrawlOnlyUrls) {
-    return { url: document.metadata.sourceURL! };
-  }
+  // V0 "return only URLs" mode was removed along with its flag.
 
   // backwards compatibility to v0 API
   const markdown = document.markdown ?? "";

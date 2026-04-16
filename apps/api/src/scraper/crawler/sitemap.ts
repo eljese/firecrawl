@@ -2,14 +2,13 @@ import type { Logger } from "winston";
 import { config } from "../../config";
 import { scrapeOptions, ScrapeOptions } from "../../controllers/v2/types";
 import { logger as _logger } from "../../lib/logger";
-import { Engine } from "../scrapeURL/adapters";
 import { scrapeURL } from "../scrapeURL";
 import { CostTracking } from "../../lib/cost-tracking";
 import {
   processSitemap,
   SitemapProcessingResult,
 } from "@mendable/firecrawl-rs";
-import { fetchFileToBuffer } from "../scrapeURL/adapters/utils/downloadFile";
+import { fetchFileToBuffer } from "../../lib/download-file";
 import { httpGateway, httpGatewayEnabled } from "../../lib/http-gateway";
 import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
@@ -55,16 +54,6 @@ async function getSitemapXML(options: SitemapScrapeOptions): Promise<string> {
   const isLocationSpecified =
     options.location && options.location.country !== "us-generic";
 
-  const forceEngine: Engine[] = [
-    ...(options.maxAge > 0 && useIndex ? ["index" as const] : []),
-    ...(useFireEngine
-      ? [
-          "fire-engine;chrome-cdp" as const,
-          "fire-engine;chrome-cdp;stealth" as const,
-        ]
-      : []),
-  ];
-
   const response = await scrapeURL(
     "sitemap;" + options.crawlId,
     options.url,
@@ -74,8 +63,6 @@ async function getSitemapXML(options: SitemapScrapeOptions): Promise<string> {
       ...(options.location ? { location: options.location } : {}),
     }),
     {
-      forceEngine,
-      v0DisableJsDom: true,
       // externalAbort: options.abort,
       teamId: "sitemap",
       zeroDataRetention: options.zeroDataRetention,

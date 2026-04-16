@@ -1,12 +1,8 @@
 import * as Sentry from "@sentry/node";
 import { logger } from "../lib/logger";
 import { config } from "../config";
-import {
-  AddFeatureError,
-  RemoveFeatureError,
-  EngineError,
-} from "../scraper/scrapeURL/error";
-import { AbortManagerThrownError } from "../scraper/scrapeURL/lib/abortManager";
+import { EngineError } from "../scraper/scrapeURL/error";
+import { AbortManagerThrownError } from "../scraper/scrapeURL/lib/abort-manager";
 import { JobCancelledError } from "../lib/error";
 
 type CaptureContext = {
@@ -61,8 +57,6 @@ if (config.SENTRY_DSN) {
 
       if (error && typeof error === "object") {
         if (
-          error instanceof AddFeatureError ||
-          error instanceof RemoveFeatureError ||
           error instanceof AbortManagerThrownError ||
           error instanceof EngineError ||
           error instanceof JobCancelledError
@@ -91,7 +85,6 @@ if (config.SENTRY_DSN) {
         const errorCode = errorCodeFromMessage;
 
         const transportableErrorCodes = [
-          "SCRAPE_ALL_ENGINES_FAILED",
           "SCRAPE_DNS_RESOLUTION_ERROR",
           "SCRAPE_SITE_ERROR",
           "SCRAPE_SSL_ERROR",
