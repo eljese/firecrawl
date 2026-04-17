@@ -57,7 +57,7 @@ export function buildSearchQuery(
 
   // Arxiv has two modes:
   //   1. When it's the ONLY category → the dedicated arxiv retrieval API is
-  //      used (handled in execute.ts) and we skip the site filter here.
+  //      used (handled in execute.ts) and we skip the site filter.
   //   2. When it's mixed with other categories → we fold `site:arxiv.org`
   //      into the search query so arxiv results are ranked alongside the rest.
   const categoryTypes = categories.map(c =>
