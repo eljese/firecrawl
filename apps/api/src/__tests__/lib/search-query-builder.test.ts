@@ -165,6 +165,48 @@ describe("Search Query Builder", () => {
       // And the map still prefers the more specific arxiv category.
       expect(result.categoryMap.get("arxiv.org")).toBe("arxiv");
     });
+
+    it("should map arxiv.org to 'arxiv' regardless of category order (arxiv first)", () => {
+      // Regression: without order-independence, the research branch would
+      // clobber arxiv's claim since arxiv.org is in the default research
+      // sites, and URL classification would depend on array order.
+      const result = buildSearchQuery("rag", ["arxiv", "research"]);
+      expect(result.categoryMap.get("arxiv.org")).toBe("arxiv");
+    });
+
+    it("should map arxiv.org to 'arxiv' regardless of category order (research first)", () => {
+      const result = buildSearchQuery("rag", ["research", "arxiv"]);
+      expect(result.categoryMap.get("arxiv.org")).toBe("arxiv");
+    });
+
+    it("should map arxiv.org to 'arxiv' regardless of order in object form", () => {
+      const a = buildSearchQuery("rag", [
+        { type: "arxiv" },
+        { type: "research" },
+      ]);
+      const b = buildSearchQuery("rag", [
+        { type: "research" },
+        { type: "arxiv" },
+      ]);
+      expect(a.categoryMap.get("arxiv.org")).toBe("arxiv");
+      expect(b.categoryMap.get("arxiv.org")).toBe("arxiv");
+    });
+
+    it("should still map arxiv.org to 'research' when arxiv is NOT selected", () => {
+      // Sanity: research alone should continue to claim arxiv.org.
+      const result = buildSearchQuery("rag", ["research"]);
+      expect(result.categoryMap.get("arxiv.org")).toBe("research");
+    });
+
+    it("should keep custom research sites mapped to 'research' when arxiv + research are both selected", () => {
+      // Arxiv only supersedes arxiv.org — other research sites stay intact.
+      const result = buildSearchQuery("rag", [
+        { type: "research", sites: ["arxiv.org", "nature.com"] },
+        { type: "arxiv" },
+      ]);
+      expect(result.categoryMap.get("arxiv.org")).toBe("arxiv");
+      expect(result.categoryMap.get("nature.com")).toBe("research");
+    });
   });
 
   describe("getCategoryFromUrl", () => {
@@ -266,6 +308,20 @@ describe("Search Query Builder", () => {
       expect(
         getCategoryFromUrl("https://export.arxiv.org/abs/2503.10677", arxivMap),
       ).toBe("arxiv");
+    });
+
+    it("should classify arxiv URLs as 'arxiv' when both arxiv and research are selected, regardless of order", () => {
+      // End-to-end regression: build the map via buildSearchQuery and then
+      // classify, covering both orderings.
+      for (const order of [
+        ["arxiv", "research"] as const,
+        ["research", "arxiv"] as const,
+      ]) {
+        const { categoryMap } = buildSearchQuery("rag", [...order]);
+        expect(
+          getCategoryFromUrl("https://arxiv.org/abs/2503.10677", categoryMap),
+        ).toBe("arxiv");
+      }
     });
   });
 

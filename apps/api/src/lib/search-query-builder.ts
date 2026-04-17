@@ -66,6 +66,11 @@ export function buildSearchQuery(
   const arxivMixed =
     categoryTypes.includes("arxiv") && categoryTypes.some(t => t !== "arxiv");
 
+  const claimForResearch = (site: string): string =>
+    site === "arxiv.org" && categoryTypes.includes("arxiv")
+      ? "arxiv"
+      : "research";
+
   for (const category of categories) {
     if (typeof category === "string") {
       // Simple string format
@@ -76,7 +81,7 @@ export function buildSearchQuery(
         // Use default research sites
         for (const site of DEFAULT_RESEARCH_SITES) {
           siteFilters.push(`site:${site}`);
-          categoryMap.set(site, "research");
+          categoryMap.set(site, claimForResearch(site));
         }
       } else if (category === "pdf") {
         hasPdfFilter = true;
@@ -97,7 +102,7 @@ export function buildSearchQuery(
         const sites = category.sites || DEFAULT_RESEARCH_SITES;
         for (const site of sites) {
           siteFilters.push(`site:${site}`);
-          categoryMap.set(site, "research");
+          categoryMap.set(site, claimForResearch(site));
         }
       } else if (category.type === "pdf") {
         hasPdfFilter = true;

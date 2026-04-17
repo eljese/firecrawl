@@ -96,12 +96,16 @@ export async function searchArxiv({
 
   const topK = Math.max(1, Math.min(limit, 100));
   const candidates = Math.max(50, topK * 10);
-  const url = buildArxivUrl({ base, query, topK, candidates });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    // Kept inside the try block so a malformed `ARXIV_SEARCH_URL` (which
+    // makes `new URL()` throw) is handled like any other arxiv failure
+    // instead of rejecting the whole search request.
+    const url = buildArxivUrl({ base, query, topK, candidates });
+
     logger.info("Calling arxiv search API", { topK, candidates });
 
     const response = await fetch(url, {
