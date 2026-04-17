@@ -184,14 +184,14 @@ async function runPipeline(meta: Meta): Promise<{
     meta.logger,
     meta.abort.asSignal(),
   );
-  if (!proxy) throw new ProxySelectionError();
 
-  let fetched = config.FIRE_ENGINE_HTTP_GATEWAY_URL
-    ? await fetchViaGateway(meta, proxy).catch(error => {
-        meta.logger.warn("gateway failed, falling back to cdp", { error });
-        return fetchViaCdp(meta, { proxy });
-      })
-    : await fetchViaCdp(meta, { proxy });
+  let fetched =
+    config.FIRE_ENGINE_HTTP_GATEWAY_URL && proxy
+      ? await fetchViaGateway(meta, proxy).catch(error => {
+          meta.logger.warn("gateway failed, falling back to cdp", { error });
+          return fetchViaCdp(meta, { proxy });
+        })
+      : await fetchViaCdp(meta, { proxy });
 
   if (fetched.via === "gateway" && htmlNeedsJs(fetched)) {
     fetched = await fetchViaCdp(meta, { prefetch: fetched, proxy });
