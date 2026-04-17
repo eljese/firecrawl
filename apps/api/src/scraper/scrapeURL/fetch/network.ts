@@ -24,6 +24,7 @@ import {
 } from "../error";
 import { getBrandingScript } from "./branding-script-bundler";
 import { shouldRunYoutube } from "../parse/youtube";
+import { robustFetch } from "../lib/fetch";
 
 const BRANDING_DEFAULT_WAIT_MS = 2000;
 const POLL_INTERVAL_MS = 500;
@@ -112,6 +113,54 @@ export async function fetchViaGateway(
       ?.value,
     proxyUsed: proxy?.isMobile ? "stealth" : "basic",
   };
+}
+
+export async function fetchViaPlaywright(meta: Meta): Promise<Fetched> {
+  return withSpan("adapter.playwright", async span => {
+    setSpanAttributes(span, {
+      "adapter.type": "playwright",
+      "adapter.url": meta.url,
+      "adapter.team_id": meta.internalOptions.teamId,
+    });
+    const response = await robustFetch({
+      url: config.PLAYWRIGHT_MICROSERVICE_URL!,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: {
+        url: meta.url,
+        wait_after_load: meta.options.waitFor,
+        timeout: meta.abort.scrapeTimeout(),
+        headers: meta.options.headers,
+        skip_tls_verification: meta.options.skipTlsVerification,
+      },
+      logger: meta.logger.child({ method: "fetchViaPlaywright/robustFetch" }),
+      schema: z.object({
+        content: z.string(),
+        pageStatusCode: z.number(),
+        pageError: z.string().optional(),
+        contentType: z.string().optional(),
+      }),
+      mock: meta.mock,
+      abort: meta.abort.asSignal(),
+    });
+
+    if (response.contentType?.includes("application/json")) {
+      response.content = await getInnerJson(response.content);
+    }
+
+    return {
+      via: "playwright",
+      url: meta.url,
+      status: response.pageStatusCode,
+      headers: response.contentType
+        ? [{ name: "content-type", value: response.contentType }]
+        : [],
+      buffer: Buffer.from(response.content, "utf8"),
+      contentType: response.contentType,
+      pageError: response.pageError,
+      proxyUsed: "basic",
+    };
+  });
 }
 
 type CdpOptions = {

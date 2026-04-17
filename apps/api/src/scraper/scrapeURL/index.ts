@@ -11,7 +11,7 @@ import {
   isUrlAllowedByRobots,
 } from "../../lib/robots-txt";
 import { getCrawl } from "../../lib/crawl-redis";
-import { CrawlDenialError } from "../../lib/error";
+import { ActionsNotSupportedError, CrawlDenialError } from "../../lib/error";
 
 import {
   buildMeta,
@@ -57,7 +57,12 @@ import { sendDocumentToSearchIndex } from "./emit/search-index";
 import { sendDocumentToIndex } from "./emit/cache-write";
 import { shapeForFormats } from "./shape";
 import { useSearchIndex } from "../../services/index";
-import { fetchProxy, fetchViaGateway, fetchViaCdp } from "./fetch/network";
+import {
+  fetchProxy,
+  fetchViaGateway,
+  fetchViaCdp,
+  fetchViaPlaywright,
+} from "./fetch/network";
 import { scrapeURLWithWikipedia, isWikimediaUrl } from "./fetch/wikipedia";
 import { scrapeURLWithIndex } from "./fetch/cache-lookup";
 import { IndexMissError } from "./error";
@@ -115,15 +120,15 @@ export async function scrapeURL(
         if (denial) return denial;
       }
 
-      const { result, adapter } = await runPipeline(meta);
-      setSpanAttributes(span, { "scrape.adapter": adapter });
+      const { result, engine } = await runPipeline(meta);
+      setSpanAttributes(span, { "scrape.engine": engine });
 
       const processed = await runPostprocessors(meta, result);
-      let document = buildDocument(meta, processed, adapter);
+      let document = buildDocument(meta, processed, engine);
 
       document = await runDerive(meta, document);
       document = await runEnrich(meta, document);
-      await runEmit(meta, document, adapter);
+      await runEmit(meta, document, engine);
       document = shapeForFormats(meta, document);
 
       setSpanAttributes(span, {
@@ -154,61 +159,77 @@ export async function scrapeURL(
   });
 }
 
-type Adapter = "wikipedia" | "index" | "gateway" | "cdp" | "pdf" | "document";
-
 async function runPipeline(meta: Meta): Promise<{
   result: EngineScrapeResult;
-  adapter: Adapter;
+  engine: Engine;
 }> {
   meta.logger.info(`Scraping URL ${JSON.stringify(meta.url)}...`);
   meta.abort.throwIfAborted();
 
   if (isWikimediaUrl(meta.url)) {
-    return { result: await scrapeURLWithWikipedia(meta), adapter: "wikipedia" };
+    return { result: await scrapeURLWithWikipedia(meta), engine: "wikipedia" };
   }
 
   enforceZdrLimits(meta);
 
   if (shouldUseIndex(meta) || meta.internalOptions.agentIndexOnly) {
     try {
-      return { result: await scrapeURLWithIndex(meta), adapter: "index" };
+      return { result: await scrapeURLWithIndex(meta), engine: "index" };
     } catch (error) {
       if (!(error instanceof IndexMissError)) throw error;
       meta.logger.debug("Index miss - falling through to live fetch");
     }
   }
 
-  const proxy = await fetchProxy(
-    hasFeature(meta, "stealthProxy") ? "mobile" : "basic",
-    meta.options.location?.country,
-    meta.logger,
-    meta.abort.asSignal(),
-  );
+  const hasFireEngine = !!config.FIRE_ENGINE_BETA_URL;
+  const hasPlaywright = !!config.PLAYWRIGHT_MICROSERVICE_URL;
 
-  let fetched =
-    config.FIRE_ENGINE_HTTP_GATEWAY_URL && proxy
-      ? await fetchViaGateway(meta, proxy).catch(error => {
-          meta.logger.warn("gateway failed, falling back to cdp", { error });
-          return fetchViaCdp(meta, { proxy });
-        })
-      : await fetchViaCdp(meta, { proxy });
+  if (!hasFireEngine && hasFeature(meta, "actions")) {
+    throw new ActionsNotSupportedError(
+      "Actions are not supported without fire-engine configured.",
+    );
+  }
 
-  if (fetched.via === "gateway" && htmlNeedsJs(fetched)) {
-    fetched = await fetchViaCdp(meta, { prefetch: fetched, proxy });
+  let fetched: Fetched;
+  if (hasFireEngine) {
+    const proxy = await fetchProxy(
+      hasFeature(meta, "stealthProxy") ? "mobile" : "basic",
+      meta.options.location?.country,
+      meta.logger,
+      meta.abort.asSignal(),
+    );
+
+    fetched =
+      config.FIRE_ENGINE_HTTP_GATEWAY_URL && proxy
+        ? await fetchViaGateway(meta, proxy).catch(error => {
+            meta.logger.warn("gateway failed, falling back to cdp", { error });
+            return fetchViaCdp(meta, { proxy });
+          })
+        : await fetchViaCdp(meta, { proxy });
+
+    if (fetched.via === "gateway" && htmlNeedsJs(fetched)) {
+      fetched = await fetchViaCdp(meta, { prefetch: fetched, proxy });
+    }
+  } else if (hasPlaywright) {
+    fetched = await fetchViaPlaywright(meta);
+  } else {
+    throw new Error(
+      "No scrape engine configured (set FIRE_ENGINE_BETA_URL or PLAYWRIGHT_MICROSERVICE_URL).",
+    );
   }
 
   if (isPdf(fetched)) {
-    return { result: await parsePdfBuffer(meta, fetched), adapter: "pdf" };
+    return { result: await parsePdfBuffer(meta, fetched), engine: "pdf" };
   }
   if (isDocument(fetched)) {
     return {
       result: await parseDocumentBuffer(meta, fetched),
-      adapter: "document",
+      engine: "document",
     };
   }
   return {
     result: toHtmlResult(fetched),
-    adapter: fetched.via === "cdp" ? "cdp" : "gateway",
+    engine: fetched.via,
   };
 }
 
@@ -353,14 +374,14 @@ async function runEnrich(meta: Meta, document: Document): Promise<Document> {
 async function runEmit(
   meta: Meta,
   document: Document,
-  adapter: string,
+  engine: Engine,
 ): Promise<void> {
   await uploadScreenshot(childMeta(meta, "uploadScreenshot"), document);
   if (useIndex) {
     await sendDocumentToIndex(
       childMeta(meta, "sendDocumentToIndex"),
       document,
-      adapter,
+      engine,
     );
   }
   if (useSearchIndex) {
@@ -405,9 +426,9 @@ async function runPostprocessors(
 function buildDocument(
   meta: Meta,
   result: EngineScrapeResult,
-  adapter: Adapter,
+  engine: Engine,
 ): Document {
-  const servedFromIndex = adapter === "index";
+  const servedFromIndex = engine === "index";
   return {
     markdown: result.markdown,
     rawHtml: result.html,
@@ -535,6 +556,8 @@ function classify(meta: Meta, error: any): string {
   }
   if (error instanceof AbortManagerThrownError)
     return "AbortManagerThrownError";
+  if (error instanceof ActionsNotSupportedError)
+    return "ActionsNotSupportedError";
   return "unknown";
 }
 

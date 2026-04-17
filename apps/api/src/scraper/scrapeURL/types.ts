@@ -1,10 +1,10 @@
 import type { ScrapeActionContent } from "../../lib/entities";
 import type { BrandingProfile } from "../../types/branding";
-import type { getPDFMaxPages } from "../../controllers/v2/types";
 
 export type Engine =
   | "gateway"
   | "cdp"
+  | "playwright"
   | "wikipedia"
   | "index"
   | "pdf"

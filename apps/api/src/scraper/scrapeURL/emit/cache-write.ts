@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { Document } from "../../../controllers/v1/types";
 import type { Meta } from "../context";
 import { hasFeature } from "../context";
+import type { Engine } from "../types";
 import {
   hashURL,
   normalizeURLForIndex,
@@ -17,7 +18,7 @@ import { hasFormatOfType } from "../../../lib/format-utils";
 export async function sendDocumentToIndex(
   meta: Meta,
   document: Document,
-  adapter: string,
+  engine: Engine,
 ): Promise<Document> {
   const screenshotFormat = hasFormatOfType(meta.options.formats, "screenshot");
   const hasCustomScreenshotSettings =
@@ -27,8 +28,8 @@ export async function sendDocumentToIndex(
   const shouldCache =
     meta.options.storeInCache &&
     !meta.internalOptions.zeroDataRetention &&
-    adapter !== "index" &&
-    !(adapter === "pdf" && !shouldParsePDF(meta.options.parsers)) &&
+    engine !== "index" &&
+    !(engine === "pdf" && !shouldParsePDF(meta.options.parsers)) &&
     !meta.options.parsers?.some(parser => {
       if (
         typeof parser === "object" &&
