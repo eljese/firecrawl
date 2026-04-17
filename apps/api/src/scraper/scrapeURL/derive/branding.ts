@@ -11,7 +11,11 @@ export async function deriveBrandingFromActions(
   if (document.branding !== undefined) return document;
 
   const brandingReturnIndex = document.actions?.javascriptReturns?.findIndex(
-    x => x.type === "object" && "branding" in (x.value as any),
+    x =>
+      x.type === "object" &&
+      x.value !== null &&
+      typeof x.value === "object" &&
+      "branding" in x.value,
   );
 
   if (brandingReturnIndex === -1 || brandingReturnIndex === undefined) {

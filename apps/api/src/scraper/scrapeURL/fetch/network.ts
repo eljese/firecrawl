@@ -57,7 +57,7 @@ export async function fetchProxy(
   const params = new URLSearchParams({
     type,
     country: (country ?? "us").toLowerCase(),
-    local: config.ENV === "dev" ? "true" : "false",
+    local: config.ENV === "local" ? "true" : "false",
   });
 
   const timeout = AbortSignal.timeout(PROXY_API_TIMEOUT_MS);
