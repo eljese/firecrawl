@@ -574,6 +574,7 @@ const baseScrapeOptions = z.strictObject({
   maxAge: z.int().gte(0).optional(),
   minAge: z.int().gte(0).optional(),
   storeInCache: z.boolean().prefault(true),
+  lockdown: z.boolean().prefault(false),
 
   profile: z
     .object({
@@ -604,6 +605,56 @@ const waitForRefine = (obj?: ScrapeOptionsBase): boolean => {
 const waitForRefineOpts = {
   message: "waitFor must not exceed half of timeout",
   path: ["waitFor"],
+};
+
+const lockdownRefine = (
+  obj: ScrapeOptionsBase,
+  ctx: z.RefinementCtx,
+): void => {
+  if (!obj.lockdown) return;
+
+  if (obj.actions && obj.actions.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "actions are not allowed when lockdown is true",
+      path: ["actions"],
+    });
+  }
+  if (obj.waitFor > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "waitFor is not allowed when lockdown is true",
+      path: ["waitFor"],
+    });
+  }
+  if (obj.headers) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "custom headers are not allowed when lockdown is true",
+      path: ["headers"],
+    });
+  }
+  if (obj.profile) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "profile is not allowed when lockdown is true",
+      path: ["profile"],
+    });
+  }
+  if (obj.proxy !== "auto") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "proxy is not allowed when lockdown is true",
+      path: ["proxy"],
+    });
+  }
+  if (obj.formats.some(f => f.type === "changeTracking")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "changeTracking format is not allowed when lockdown is true",
+      path: ["formats"],
+    });
+  }
 };
 
 // Base transform function that handles both nullable and non-nullable cases
@@ -642,6 +693,10 @@ const extractTransformImpl = <T extends ScrapeOptionsBase | undefined>(
     result = { ...result, timeout: 120000 };
   }
 
+  if (obj.lockdown && obj.maxAge === undefined) {
+    result = { ...result, maxAge: Number.MAX_SAFE_INTEGER };
+  }
+
   return result as T extends undefined ? undefined : T;
 };
 
@@ -672,6 +727,7 @@ export const scrapeOptions = strictWithMessage(baseScrapeOptions)
     },
   )
   .refine(waitForRefine, waitForRefineOpts)
+  .superRefine(lockdownRefine)
   .transform(extractTransformRequired);
 
 export type BaseScrapeOptions = z.infer<typeof baseScrapeOptions>;
@@ -816,6 +872,7 @@ const scrapeRequestSchemaBase = baseScrapeOptions.extend({
 
 export const scrapeRequestSchema = strictWithMessage(scrapeRequestSchemaBase)
   .refine(waitForRefine, waitForRefineOpts)
+  .superRefine(lockdownRefine)
   .transform(extractTransformRequired);
 
 export type ScrapeRequest = z.infer<typeof scrapeRequestSchema>;
@@ -856,6 +913,7 @@ export const batchScrapeRequestSchema = strictWithMessage(
   batchScrapeRequestSchemaBase,
 )
   .refine(waitForRefine, waitForRefineOpts)
+  .superRefine(lockdownRefine)
   .transform(extractTransformRequired);
 
 const batchScrapeRequestSchemaNoURLValidationBase = baseScrapeOptions.extend({
@@ -880,6 +938,7 @@ export const batchScrapeRequestSchemaNoURLValidation = strictWithMessage(
   batchScrapeRequestSchemaNoURLValidationBase,
 )
   .refine(waitForRefine, waitForRefineOpts)
+  .superRefine(lockdownRefine)
   .transform(extractTransformRequired);
 
 export type BatchScrapeRequest = z.infer<typeof batchScrapeRequestSchema>;

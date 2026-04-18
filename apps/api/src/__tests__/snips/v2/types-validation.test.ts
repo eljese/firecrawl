@@ -449,6 +449,160 @@ describe("V2 Types Validation", () => {
 
       expect(() => scrapeRequestSchema.parse(input)).toThrow();
     });
+
+    describe("lockdown", () => {
+      it("should default lockdown to false", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+        };
+
+        const result = scrapeRequestSchema.parse(input);
+        expect(result.lockdown).toBe(false);
+      });
+
+      it("should accept lockdown: true with compatible options", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: true,
+          formats: [{ type: "markdown" }, { type: "html" }],
+          onlyMainContent: true,
+        };
+
+        const result = scrapeRequestSchema.parse(input);
+        expect(result.lockdown).toBe(true);
+      });
+
+      it("should default maxAge to MAX_SAFE_INTEGER when lockdown is true and maxAge is unset", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: true,
+        };
+
+        const result = scrapeRequestSchema.parse(input);
+        expect(result.maxAge).toBe(Number.MAX_SAFE_INTEGER);
+      });
+
+      it("should preserve maxAge when lockdown is true and maxAge is provided", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: true,
+          maxAge: 60000,
+        };
+
+        const result = scrapeRequestSchema.parse(input);
+        expect(result.maxAge).toBe(60000);
+      });
+
+      it("should not set maxAge default when lockdown is false", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: false,
+        };
+
+        const result = scrapeRequestSchema.parse(input);
+        expect(result.maxAge).toBeUndefined();
+      });
+
+      it("should reject lockdown: true with actions", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: true,
+          actions: [{ type: "click", selector: "button" }],
+        };
+
+        expect(() => scrapeRequestSchema.parse(input)).toThrow(
+          "actions are not allowed when lockdown is true",
+        );
+      });
+
+      it("should reject lockdown: true with waitFor > 0", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: true,
+          waitFor: 1000,
+          timeout: 30000,
+        };
+
+        expect(() => scrapeRequestSchema.parse(input)).toThrow(
+          "waitFor is not allowed when lockdown is true",
+        );
+      });
+
+      it("should reject lockdown: true with custom headers", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: true,
+          headers: { "X-Custom": "value" },
+        };
+
+        expect(() => scrapeRequestSchema.parse(input)).toThrow(
+          "custom headers are not allowed when lockdown is true",
+        );
+      });
+
+      it("should reject lockdown: true with profile", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: true,
+          profile: { name: "my-profile" },
+        };
+
+        expect(() => scrapeRequestSchema.parse(input)).toThrow(
+          "profile is not allowed when lockdown is true",
+        );
+      });
+
+      it("should reject lockdown: true with non-auto proxy", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: true,
+          proxy: "basic",
+        };
+
+        expect(() => scrapeRequestSchema.parse(input)).toThrow(
+          "proxy is not allowed when lockdown is true",
+        );
+      });
+
+      it("should accept lockdown: true with proxy: auto (default)", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: true,
+          proxy: "auto",
+        };
+
+        const result = scrapeRequestSchema.parse(input);
+        expect(result.lockdown).toBe(true);
+      });
+
+      it("should reject lockdown: true with changeTracking format", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: true,
+          formats: [
+            { type: "markdown" },
+            { type: "changeTracking" },
+          ],
+        };
+
+        expect(() => scrapeRequestSchema.parse(input)).toThrow(
+          "changeTracking format is not allowed when lockdown is true",
+        );
+      });
+
+      it("should accept lockdown: false with any options (no restrictions)", () => {
+        const input: ScrapeRequestInput = {
+          url: "https://example.com",
+          lockdown: false,
+          actions: [{ type: "click", selector: "button" }],
+          headers: { "X-Custom": "value" },
+          proxy: "basic",
+        };
+
+        const result = scrapeRequestSchema.parse(input);
+        expect(result.lockdown).toBe(false);
+      });
+    });
   });
 
   describe("extractRequestSchema", () => {
