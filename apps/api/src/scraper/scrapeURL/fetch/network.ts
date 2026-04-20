@@ -145,8 +145,9 @@ export async function fetchViaPlaywright(meta: Meta): Promise<Fetched> {
       abort: meta.abort.asSignal(),
     });
 
+    let buffer = Buffer.from(response.content, "base64");
     if (response.contentType?.includes("application/json")) {
-      response.content = await getInnerJson(response.content);
+      buffer = Buffer.from(await getInnerJson(buffer.toString("utf8")), "utf8");
     }
 
     return {
@@ -156,7 +157,7 @@ export async function fetchViaPlaywright(meta: Meta): Promise<Fetched> {
       headers: response.contentType
         ? [{ name: "content-type", value: response.contentType }]
         : [],
-      buffer: Buffer.from(response.content, "utf8"),
+      buffer,
       contentType: response.contentType,
       pageError: response.pageError,
       proxyUsed: "basic",
@@ -426,13 +427,6 @@ async function performCdpScrape(
     const status = isProcessing(submit)
       ? await pollCdpStatus(meta, submit.jobId, baseUrl)
       : submit;
-
-    const contentType = Object.entries(status.responseHeaders ?? {}).find(
-      ([k]) => k.toLowerCase() === "content-type",
-    )?.[1];
-    if (contentType?.includes("application/json")) {
-      status.content = await getInnerJson(status.content);
-    }
 
     meta.logger.debug("chrome-cdp scrape complete", {
       status: status.pageStatusCode,

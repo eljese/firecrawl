@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        engine: ['playwright'] # fetch engine disabled: branch refactor dropped the direct-HTTP path
+        engine: ['playwright']
         proxy: ['proxy', 'no-proxy'] # proxy / no-proxy run different tests, keep both
         search: ['searxng'] # disabled google for now, should be fine with just Searxng
         ai: ['openai'] # AI only should be fine, as it simply adds tests, if non-AI fails, AI will fail.
@@ -50,6 +50,7 @@ jobs:
       NUQ_RABBITMQ_URL: amqp://localhost:5672
       USE_GO_MARKDOWN_PARSER: true
       ALLOW_LOCAL_WEBHOOKS: true
+      DISABLE_SSRF_PROXY: true
       FIRECRAWL_LOG_TO_FILE: true
     steps:
       - uses: actions/checkout@v5
@@ -230,7 +231,7 @@ jobs:
         shell: python3 {0}
         env:
           JUNIT: apps/api/test-results/junit.xml
-          MATRIX_LABEL: "${{ matrix.engine }}, ${{ matrix.proxy }}, ${{ matrix.search }}, ${{ matrix.ai }}"
+          MATRIX_LABEL: '${{ matrix.engine }}, ${{ matrix.proxy }}, ${{ matrix.search }}, ${{ matrix.ai }}'
         run: |
           import os, sys, xml.etree.ElementTree as ET
 

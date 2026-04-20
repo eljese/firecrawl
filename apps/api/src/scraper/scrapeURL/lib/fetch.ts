@@ -9,6 +9,8 @@ import { cacheableLookup } from "./cacheable-lookup";
 import { AbortManagerThrownError } from "./abort-manager";
 
 const fireEngineURL = config.FIRE_ENGINE_BETA_URL ?? "<mock-fire-engine-url>";
+const playwrightURL =
+  config.PLAYWRIGHT_MICROSERVICE_URL ?? "<mock-playwright-url>";
 
 type Method = "GET" | "POST" | "DELETE" | "PUT";
 
@@ -60,12 +62,17 @@ function mockResponseFor(
   body: any,
 ): RawResponse {
   const makeId = (x: { url: string; method: string; body?: any }) => {
-    const u = x.url.startsWith(fireEngineURL)
-      ? x.url.replace(fireEngineURL, "<fire-engine>")
-      : x.url;
+    let u = x.url;
+    if (u.startsWith(fireEngineURL)) {
+      u = u.replace(fireEngineURL, "<fire-engine>");
+    } else if (u.startsWith(playwrightURL)) {
+      u = u.replace(playwrightURL, "<playwright>");
+    }
     let out = u + ";" + x.method;
     if (u.startsWith("<fire-engine>") && x.method === "POST") {
       out += "f-e;" + x.body?.engine + ";" + x.body?.url;
+    } else if (u.startsWith("<playwright>") && x.method === "POST") {
+      out += "pw;" + x.body?.url;
     }
     return out;
   };
