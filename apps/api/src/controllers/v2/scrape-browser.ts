@@ -37,12 +37,10 @@ import {
 } from "../../lib/scrape-interact/scrape-replay";
 import {
   executePromptViaBrowserAgent,
+  executeCodeViaBrowserSession,
   AgentResult,
 } from "../../lib/scrape-interact/browser-agent";
-import {
-  traceInteract,
-  sanitizeUrlForTrace,
-} from "../../lib/scrape-interact/langsmith";
+import { sanitizeUrlForTrace } from "../../lib/scrape-interact/langsmith";
 import { getScrapeZDR } from "../../lib/zdr-helpers";
 import { RequestWithAuth, ScrapeOptions } from "./types";
 import { billTeam } from "../../services/billing/credit_billing";
@@ -287,34 +285,18 @@ export async function scrapeInteractController(
   } else {
     logger.info("Executing code in browser session", { language, timeout });
 
-    const execCode = traceInteract(
-      async () =>
-        browserServiceRequest<BrowserServiceExecResponse>(
-          "POST",
-          `/browsers/${session!.browser_id}/exec`,
-          { code: rawCode!, language, timeout, origin },
-        ),
-      {
-        thread_id: session.id,
-        session_id: session.id,
-        scrape_id: scrapeId,
-        team_id: req.auth.team_id,
-        browser_id: session.browser_id,
-        mode: "code",
-        zeroDataRetention: zdrForced,
-        scrape_url: traceScrapeContext.scrapeUrl,
-        target_url: traceScrapeContext.targetUrl,
-        scrape_wait_for_ms: traceScrapeContext.scrapeWaitForMs,
-        scrape_actions: traceScrapeContext.scrapeActions,
-        scrape_origin: traceScrapeContext.scrapeOrigin,
-      },
-      {
-        name: "interact:code",
-      },
-    );
-
     try {
-      execResult = await execCode();
+      execResult = await executeCodeViaBrowserSession(
+        session.browser_id,
+        { code: rawCode!, language, timeout, origin },
+        {
+          sessionId: session.id,
+          scrapeId,
+          teamId: req.auth.team_id,
+          zeroDataRetention: zdrForced,
+          ...traceScrapeContext,
+        },
+      );
     } catch (err) {
       logger.error("Failed to execute code via browser service", {
         error: err,

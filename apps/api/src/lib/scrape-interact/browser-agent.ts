@@ -12,6 +12,7 @@ import { config } from "../../config";
 import {
   generateText,
   buildLangSmithProviderOptions,
+  traceInteract,
   InteractTraceMetadata,
 } from "./langsmith";
 
@@ -409,4 +410,50 @@ export async function executePromptViaBrowserAgent(
       killed: false,
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Code path — direct exec wrapped with the same trace metadata shape as the
+// prompt path, so tracing details don't have to live in the controller.
+// ---------------------------------------------------------------------------
+
+export async function executeCodeViaBrowserSession(
+  browserId: string,
+  params: {
+    code: string;
+    language: string;
+    timeout: number;
+    origin?: string;
+  },
+  trace?: BrowserAgentTraceContext,
+): Promise<BrowserServiceExecResponse> {
+  const run = async () =>
+    browserServiceRequest<BrowserServiceExecResponse>(
+      "POST",
+      `/browsers/${browserId}/exec`,
+      params,
+    );
+
+  if (!trace) return run();
+
+  const traced = traceInteract(
+    run,
+    {
+      thread_id: trace.sessionId,
+      session_id: trace.sessionId,
+      scrape_id: trace.scrapeId,
+      team_id: trace.teamId,
+      browser_id: browserId,
+      mode: "code",
+      zeroDataRetention: trace.zeroDataRetention,
+      scrape_url: trace.scrapeUrl,
+      target_url: trace.targetUrl,
+      scrape_wait_for_ms: trace.scrapeWaitForMs,
+      scrape_actions: trace.scrapeActions,
+      scrape_origin: trace.scrapeOrigin,
+    } satisfies InteractTraceMetadata,
+    { name: "interact:code" },
+  );
+
+  return traced();
 }
