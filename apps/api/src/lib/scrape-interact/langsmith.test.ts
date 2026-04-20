@@ -72,6 +72,20 @@ describe("scrape-interact/langsmith (disabled — no API key)", () => {
     await expect(wrapped(3)).resolves.toBe(6);
   });
 
+  it("treats an API key alone (no LANGSMITH_TRACING) as disabled", () => {
+    jest.resetModules();
+    jest.doMock("../../config", () => ({
+      config: {
+        LANGSMITH_API_KEY: "real-looking-key",
+        LANGSMITH_TRACING: undefined,
+        LANGSMITH_PROJECT: undefined,
+        LANGSMITH_ENDPOINT: undefined,
+      },
+    }));
+    const mod = require("./langsmith");
+    expect(mod.isLangSmithEnabled).toBe(false);
+  });
+
   it("treats whitespace-only LANGSMITH_API_KEY as disabled", () => {
     jest.resetModules();
     jest.doMock("../../config", () => ({

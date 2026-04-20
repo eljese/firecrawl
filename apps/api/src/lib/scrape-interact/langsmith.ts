@@ -9,11 +9,11 @@ const logger = _logger.child({ module: "scrape-interact/langsmith" });
 // 401 against LangSmith with no other signal that something's wrong.
 const LANGSMITH_API_KEY = config.LANGSMITH_API_KEY?.trim() || undefined;
 
+// Opt-in: require both a key AND explicit LANGSMITH_TRACING=true. Having a
+// key alone shouldn't start shipping traces, since operators may set the key
+// for local experimentation and be surprised when prod starts tracing too.
 export const isLangSmithEnabled = Boolean(
-  LANGSMITH_API_KEY &&
-    (config.LANGSMITH_TRACING === undefined
-      ? true
-      : config.LANGSMITH_TRACING === true),
+  LANGSMITH_API_KEY && config.LANGSMITH_TRACING === true,
 );
 
 export type InteractTraceMetadata = {
