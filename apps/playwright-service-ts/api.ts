@@ -262,7 +262,12 @@ const scrapePage = async (
     }
     bytes = Buffer.from(await page.content(), 'utf8');
   } else {
-    bytes = await finalResponse!.body();
+    // Non-HTML response where no download fired (PDF viewer disabled races,
+    // inline binaries, etc.). response.body() is flaky here because Chromium
+    // discards the buffer once navigation aborts. Re-fetch through the
+    // context's APIRequestContext — same proxy, same TLS config, reliable.
+    const apiResp = await page.context().request.get(url, { maxRedirects: 20 });
+    bytes = await apiResp.body();
   }
 
   page.off('response', onResponse);
