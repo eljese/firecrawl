@@ -96,7 +96,10 @@ describe("scrape-interact/langsmith (disabled — no API key)", () => {
     );
     expect(sanitizeUrlForTrace(null)).toBeUndefined();
     expect(sanitizeUrlForTrace(undefined)).toBeUndefined();
-    // Invalid URL → returned as-is, not thrown
+    // Malformed URL still gets query/fragment stripped
+    expect(sanitizeUrlForTrace("not a url?token=secret#frag")).toBe(
+      "not a url",
+    );
     expect(sanitizeUrlForTrace("not a url")).toBe("not a url");
   });
 });

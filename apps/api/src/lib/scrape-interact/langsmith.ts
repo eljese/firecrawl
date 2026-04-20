@@ -43,19 +43,14 @@ export type InteractTraceMetadata = {
 
 /**
  * Strip query string + fragment from a URL so it can safely go into trace
- * metadata. Returns origin + pathname only. Falls back to the raw string if
- * URL parsing fails, which is acceptable since the metadata is best-effort.
+ * metadata. A plain split is used rather than `new URL()` so malformed inputs
+ * can't slip through a `catch` branch still carrying `?token=...` fragments.
  */
 export function sanitizeUrlForTrace(
   url: string | null | undefined,
 ): string | undefined {
   if (!url) return undefined;
-  try {
-    const u = new URL(url);
-    return `${u.origin}${u.pathname}`;
-  } catch {
-    return url;
-  }
+  return url.split("?")[0].split("#")[0];
 }
 
 type WrappedAISDK = {
