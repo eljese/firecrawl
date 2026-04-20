@@ -431,14 +431,17 @@ export async function executeCodeViaBrowserSession(
   },
   trace?: BrowserAgentTraceContext,
 ): Promise<BrowserServiceExecResponse> {
-  const run = async () =>
+  // Arg must be named so langsmith's traceable sees the exec params as the
+  // run's `inputs`; a zero-arg closure would record `{}` and strip the code,
+  // language, timeout, and origin from every trace.
+  const run = async (execParams: typeof params) =>
     browserServiceRequest<BrowserServiceExecResponse>(
       "POST",
       `/browsers/${browserId}/exec`,
-      params,
+      execParams,
     );
 
-  if (!trace) return run();
+  if (!trace) return run(params);
 
   const traced = traceInteract(
     run,
@@ -461,5 +464,5 @@ export async function executeCodeViaBrowserSession(
     { name: "interact:code" },
   );
 
-  return traced();
+  return traced(params);
 }
