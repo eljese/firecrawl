@@ -528,6 +528,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
           credits_cost: credits_billed ?? 0,
           zeroDataRetention: job.data.zeroDataRetention,
           skipNuq: job.data.skipNuq ?? false,
+          is_parse: !!job.data.file,
         },
         true,
       );
@@ -611,6 +612,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
           credits_cost: credits_billed ?? 0,
           zeroDataRetention: job.data.zeroDataRetention,
           skipNuq: job.data.skipNuq ?? false,
+          is_parse: !!job.data.file,
         },
         false,
       );
@@ -786,6 +788,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
         credits_cost: credits_billed ?? 0,
         zeroDataRetention: job.data.zeroDataRetention,
         skipNuq: job.data.skipNuq ?? false,
+        is_parse: !!job.data.file,
       },
       true,
     );

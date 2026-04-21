@@ -4,6 +4,7 @@ import {
   ScrapeOptions,
   Document as V2Document,
   TeamFlags,
+  UploadedParseFile,
 } from "./controllers/v2/types";
 import { AuthCreditUsageChunk } from "./controllers/v1/types";
 import { ExtractorOptions, Document } from "./lib/entities";
@@ -37,6 +38,8 @@ type ScrapeJobSingleUrlsUnique = {
   crawlerOptions?: any;
   scrapeOptions: BaseScrapeOptions;
   internalOptions?: InternalOptions;
+  /** In-memory upload for /v2/parse jobs (never serialized — parse uses skipNuq). */
+  file?: UploadedParseFile;
   origin: string;
   crawl_id?: string;
   sitemapped?: boolean;
@@ -97,6 +100,8 @@ export interface RunWebScraperParams {
   url: string;
   scrapeOptions: ScrapeOptions;
   internalOptions?: InternalOptions;
+  /** When present, parse this buffer instead of fetching `url`. */
+  file?: UploadedParseFile;
   team_id: string;
   bull_job_id: string;
   priority?: number;

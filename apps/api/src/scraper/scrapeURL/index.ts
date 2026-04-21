@@ -1,10 +1,6 @@
-import type { Document } from "../../controllers/v2/types";
 import type { ScrapeOptions } from "../../controllers/v2/types";
 import { CostTracking } from "../../lib/cost-tracking";
 import { withSpan, setSpanAttributes } from "../../lib/otel-tracer";
-import { captureExceptionWithZdrCheck } from "../../services/sentry";
-import { hasFormatOfType } from "../../lib/format-utils";
-import { useIndex } from "../../services/index";
 import {
   fetchRobotsTxt,
   createRobotsChecker,
@@ -12,6 +8,7 @@ import {
 } from "../../lib/robots-txt";
 import { getCrawl } from "../../lib/crawl-redis";
 import { ActionsNotSupportedError, CrawlDenialError } from "../../lib/error";
+import { config } from "../../config";
 
 import {
   buildMeta,
@@ -20,43 +17,24 @@ import {
   type Meta,
   type InternalOptions,
 } from "./context";
-import type { Engine, EngineScrapeResult, Fetched, FeatureFlag } from "./types";
+import type { Engine, EngineScrapeResult, Fetched } from "./types";
 import {
-  ActionError,
-  SiteError,
-  UnsupportedFileError,
-  SSLError,
-  PDFInsufficientTimeError,
-  PDFOCRRequiredError,
-  DNSResolutionError,
-  ProxySelectionError,
-  BrandingNotSupportedError,
+  IndexMissError,
+  LockdownMissError,
   ZDRViolationError,
+  ProxySelectionError,
 } from "./error";
-import { AbortManagerThrownError } from "./lib/abort-manager";
 import {
-  LLMRefusalError,
-  performLLMExtract,
-  performSummary,
-  performCleanContent,
-} from "./enrich/llm-extract";
-import { performQuery } from "./enrich/query";
-import { performAgent } from "./enrich/agent";
-import { deriveDiff } from "./enrich/diff";
-import { performAttributes } from "./derive/attributes";
-import { removeBase64Images } from "./derive/remove-base64-images";
-import { deriveHTMLFromRawHTML } from "./derive/html";
-import { deriveMarkdownFromHTML } from "./derive/markdown";
-import { deriveMetadataFromRawHTML } from "./derive/metadata";
-import { deriveLinksFromHTML } from "./derive/links";
-import { deriveImagesFromHTML } from "./derive/images";
-import { deriveBrandingFromActions } from "./derive/branding";
-import { uploadScreenshot } from "./emit/upload-screenshot";
-import { fetchAudio } from "./enrich/audio";
-import { sendDocumentToSearchIndex } from "./emit/search-index";
-import { sendDocumentToIndex } from "./emit/cache-write";
+  buildDocument,
+  runDerive,
+  runEnrich,
+  runEmit,
+  handleScrapeError,
+  logScrapeMetrics,
+  shouldUseIndex,
+  type ScrapeUrlResponse,
+} from "./pipeline";
 import { shapeForFormats } from "./shape";
-import { useSearchIndex } from "../../services/index";
 import {
   fetchProxy,
   fetchViaGateway,
@@ -65,23 +43,14 @@ import {
 } from "./fetch/network";
 import { scrapeURLWithWikipedia, isWikimediaUrl } from "./fetch/wikipedia";
 import { scrapeURLWithIndex } from "./fetch/cache-lookup";
-import { IndexMissError } from "./error";
 import { parsePdfBuffer } from "./parse/pdf";
 import { parseDocumentBuffer } from "./parse/document";
 import { isPdf } from "./parse/pdf/pdf-utils";
+import { isDocument, htmlNeedsJs, toHtmlResult } from "./parse/classify";
 import { shouldRunYoutube, runYoutube } from "./parse/youtube";
-import { getPDFMaxPages } from "../../controllers/v2/types";
-import { config } from "../../config";
 
-export type { Meta, InternalOptions };
-
-export type ScrapeUrlResponse =
-  | {
-      success: true;
-      document: Document;
-      unsupportedFeatures?: Set<FeatureFlag>;
-    }
-  | { success: false; error: any };
+export type { Meta, InternalOptions, ScrapeUrlResponse };
+export { scrapeFile } from "./scrape-file";
 
 export async function scrapeURL(
   id: string,
@@ -177,8 +146,12 @@ async function runPipeline(meta: Meta): Promise<{
       return { result: await scrapeURLWithIndex(meta), engine: "index" };
     } catch (error) {
       if (!(error instanceof IndexMissError)) throw error;
+      if (meta.options.lockdown) throw new LockdownMissError();
       meta.logger.debug("Index miss - falling through to live fetch");
     }
+  } else if (meta.options.lockdown) {
+    // Lockdown forbids live fetch: if the index wasn't even eligible, miss.
+    throw new LockdownMissError();
   }
 
   const hasFireEngine = !!config.FIRE_ENGINE_BETA_URL;
@@ -233,57 +206,6 @@ async function runPipeline(meta: Meta): Promise<{
   };
 }
 
-const DOCUMENT_CONTENT_TYPES = [
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-excel",
-  "application/msword",
-  "application/rtf",
-  "text/rtf",
-  "application/vnd.oasis.opendocument.text",
-];
-
-function isDocument(f: Fetched): boolean {
-  const ct = f.contentType?.toLowerCase();
-  if (!ct) return false;
-  return DOCUMENT_CONTENT_TYPES.some(t => ct.includes(t));
-}
-
-function htmlNeedsJs(f: Fetched): boolean {
-  const ct = f.contentType;
-  if (!ct || !ct.toLowerCase().includes("text/html")) return false;
-  const sniff = f.buffer.subarray(0, Math.min(f.buffer.length, 64 * 1024));
-  return /<script\b/i.test(sniff.toString("utf8"));
-}
-
-function decodeHtml(buf: Buffer): string {
-  const html = buf.toString("utf8");
-  const charset = (html.match(
-    /<meta\b[^>]*charset\s*=\s*["']?([^"'\s\/>]+)/i,
-  ) ?? [])[1];
-  if (!charset || charset.trim().toLowerCase() === "utf-8") return html;
-  try {
-    return new TextDecoder(charset.trim()).decode(buf);
-  } catch {
-    return html;
-  }
-}
-
-function toHtmlResult(f: Fetched): EngineScrapeResult {
-  return {
-    url: f.url,
-    html: decodeHtml(f.buffer),
-    statusCode: f.status,
-    contentType: f.contentType,
-    proxyUsed: f.proxyUsed,
-    error: f.pageError,
-    screenshot: f.screenshots?.[0],
-    actions: f.actions,
-    youtubeTranscriptContent: f.youtubeTranscriptContent,
-    timezone: f.timezone,
-  };
-}
-
 function enforceZdrLimits(meta: Meta): void {
   if (!meta.internalOptions.zeroDataRetention) return;
   if (hasFeature(meta, "screenshot")) throw new ZDRViolationError("screenshot");
@@ -296,104 +218,6 @@ function enforceZdrLimits(meta: Meta): void {
   if (meta.options.actions?.some(x => x.type === "pdf")) {
     throw new ZDRViolationError("pdf action");
   }
-}
-
-function shouldUseIndex(meta: Meta): boolean {
-  const shot = hasFormatOfType(meta.options.formats, "screenshot");
-  const hasCustomScreenshotSettings =
-    shot?.viewport !== undefined || shot?.quality !== undefined;
-
-  return (
-    useIndex &&
-    config.FIRECRAWL_INDEX_WRITE_ONLY !== true &&
-    !hasFormatOfType(meta.options.formats, "changeTracking") &&
-    !hasFormatOfType(meta.options.formats, "branding") &&
-    getPDFMaxPages(meta.options.parsers) === undefined &&
-    !hasCustomScreenshotSettings &&
-    meta.options.maxAge !== 0 &&
-    (meta.options.headers === undefined ||
-      Object.keys(meta.options.headers).length === 0) &&
-    (meta.options.actions === undefined || meta.options.actions.length === 0) &&
-    meta.options.profile === undefined
-  );
-}
-
-async function runDerive(meta: Meta, document: Document): Promise<Document> {
-  document = await deriveHTMLFromRawHTML(
-    childMeta(meta, "deriveHTMLFromRawHTML"),
-    document,
-  );
-  document = await deriveMarkdownFromHTML(
-    childMeta(meta, "deriveMarkdownFromHTML"),
-    document,
-  );
-  document = await deriveLinksFromHTML(
-    childMeta(meta, "deriveLinksFromHTML"),
-    document,
-  );
-  document = await deriveImagesFromHTML(
-    childMeta(meta, "deriveImagesFromHTML"),
-    document,
-  );
-  document = await deriveBrandingFromActions(
-    childMeta(meta, "deriveBrandingFromActions"),
-    document,
-  );
-  document = await deriveMetadataFromRawHTML(
-    childMeta(meta, "deriveMetadataFromRawHTML"),
-    document,
-  );
-  document = await performAttributes(
-    childMeta(meta, "performAttributes"),
-    document,
-  );
-  return document;
-}
-
-async function runEnrich(meta: Meta, document: Document): Promise<Document> {
-  document = await performCleanContent(
-    childMeta(meta, "performCleanContent"),
-    document,
-  );
-  document = await performLLMExtract(
-    childMeta(meta, "performLLMExtract"),
-    document,
-  );
-  document = await performSummary(childMeta(meta, "performSummary"), document);
-  document = await performQuery(childMeta(meta, "performQuery"), document);
-  document = await performAgent(childMeta(meta, "performAgent"), document);
-  document = await removeBase64Images(
-    childMeta(meta, "removeBase64Images"),
-    document,
-  );
-  document = await deriveDiff(childMeta(meta, "deriveDiff"), document);
-  document = await fetchAudio(childMeta(meta, "fetchAudio"), document);
-  return document;
-}
-
-async function runEmit(
-  meta: Meta,
-  document: Document,
-  engine: Engine,
-): Promise<void> {
-  await uploadScreenshot(childMeta(meta, "uploadScreenshot"), document);
-  if (useIndex) {
-    await sendDocumentToIndex(
-      childMeta(meta, "sendDocumentToIndex"),
-      document,
-      engine,
-    );
-  }
-  if (useSearchIndex) {
-    await sendDocumentToSearchIndex(
-      childMeta(meta, "sendDocumentToSearchIndex"),
-      document,
-    );
-  }
-}
-
-function childMeta(meta: Meta, method: string): Meta {
-  return { ...meta, logger: meta.logger.child({ method }) };
 }
 
 async function runPostprocessors(
@@ -421,41 +245,6 @@ async function runPostprocessors(
     meta.logger.warn("Failed to run postprocessor youtube", { error });
     return engineResult;
   }
-}
-
-function buildDocument(
-  meta: Meta,
-  result: EngineScrapeResult,
-  engine: Engine,
-): Document {
-  const servedFromIndex = engine === "index";
-  return {
-    markdown: result.markdown,
-    rawHtml: result.html,
-    screenshot: result.screenshot,
-    actions: result.actions,
-    branding: result.branding,
-    metadata: {
-      sourceURL: meta.sourceURL,
-      url: result.url,
-      statusCode: result.statusCode,
-      error: result.error,
-      numPages: result.pdfMetadata?.numPages,
-      ...(result.pdfMetadata?.title ? { title: result.pdfMetadata.title } : {}),
-      contentType: result.contentType,
-      timezone: result.timezone,
-      proxyUsed: result.proxyUsed,
-      ...(servedFromIndex
-        ? result.cacheInfo
-          ? {
-              cacheState: "hit" as const,
-              cachedAt: result.cacheInfo.created_at.toISOString(),
-            }
-          : { cacheState: "miss" as const }
-        : {}),
-      postprocessorsUsed: result.postprocessorsUsed,
-    },
-  };
 }
 
 async function checkRobots(meta: Meta): Promise<ScrapeUrlResponse | undefined> {
@@ -513,115 +302,4 @@ async function checkRobots(meta: Meta): Promise<ScrapeUrlResponse | undefined> {
     }
     throw error;
   }
-}
-
-const ERROR_KINDS: Array<[new (...args: any[]) => Error, string, string]> = [
-  [LLMRefusalError, "LLMRefusalError", "LLM refused to extract content"],
-  [SiteError, "SiteError", "Site failed to load in browser"],
-  [SSLError, "SSLError", "SSL error"],
-  [ActionError, "ActionError", "Action(s) failed to complete"],
-  [UnsupportedFileError, "UnsupportedFileError", "Unsupported file type"],
-  [
-    PDFInsufficientTimeError,
-    "PDFInsufficientTimeError",
-    "Insufficient time to process PDF",
-  ],
-  [
-    PDFOCRRequiredError,
-    "PDFOCRRequiredError",
-    "PDF requires OCR but fast mode was requested",
-  ],
-  [
-    BrandingNotSupportedError,
-    "BrandingNotSupportedError",
-    "Branding not supported for this content",
-  ],
-  [ProxySelectionError, "ProxySelectionError", "Proxy selection error"],
-  [DNSResolutionError, "DNSResolutionError", "DNS resolution error"],
-];
-
-function classify(meta: Meta, error: any): string {
-  if (
-    error instanceof Error &&
-    error.message.includes("Invalid schema for response_format")
-  ) {
-    meta.logger.warn("scrapeURL: LLM schema error", { error });
-    return "LLMSchemaError";
-  }
-  for (const [cls, name, msg] of ERROR_KINDS) {
-    if (error instanceof cls) {
-      meta.logger.warn("scrapeURL: " + msg, { error });
-      return name;
-    }
-  }
-  if (error instanceof AbortManagerThrownError)
-    return "AbortManagerThrownError";
-  if (error instanceof ActionsNotSupportedError)
-    return "ActionsNotSupportedError";
-  return "unknown";
-}
-
-function handleScrapeError(
-  meta: Meta,
-  error: any,
-  startTime: number,
-  span: any,
-  internalOptions: InternalOptions,
-): ScrapeUrlResponse {
-  const errorType = classify(meta, error);
-  if (errorType === "AbortManagerThrownError") {
-    throw (error as AbortManagerThrownError).inner;
-  }
-  if (errorType === "unknown") {
-    captureExceptionWithZdrCheck(error, {
-      extra: { zeroDataRetention: internalOptions.zeroDataRetention ?? false },
-    });
-    meta.logger.error("scrapeURL: Unexpected error happened", { error });
-  }
-  setSpanAttributes(span, {
-    "scrape.success": false,
-    "scrape.error": error instanceof Error ? error.message : String(error),
-    "scrape.error_type": errorType,
-    "scrape.duration_ms": Date.now() - startTime,
-  });
-  return { success: false, error };
-}
-
-function logScrapeMetrics(
-  meta: Meta,
-  startTime: number,
-  success: boolean,
-  indexHit: boolean,
-): void {
-  const base = {
-    module: "scrapeURL/metrics",
-    timeTaken: Date.now() - startTime,
-    maxAgeValid: (meta.options.maxAge ?? 0) > 0,
-    shouldUseIndex: shouldUseIndex(meta),
-    success,
-    indexHit,
-  };
-  if (!useIndex) {
-    meta.logger.debug("scrapeURL metrics", base);
-    return;
-  }
-  meta.logger.debug("scrapeURL metrics", {
-    ...base,
-    changeTrackingEnabled: !!hasFormatOfType(
-      meta.options.formats,
-      "changeTracking",
-    ),
-    summaryEnabled: !!hasFormatOfType(meta.options.formats, "summary"),
-    jsonEnabled: !!hasFormatOfType(meta.options.formats, "json"),
-    screenshotEnabled: !!hasFormatOfType(meta.options.formats, "screenshot"),
-    imagesEnabled: !!hasFormatOfType(meta.options.formats, "images"),
-    brandingEnabled: !!hasFormatOfType(meta.options.formats, "branding"),
-    pdfMaxPages: getPDFMaxPages(meta.options.parsers),
-    maxAge: meta.options.maxAge,
-    headers: meta.options.headers
-      ? Object.keys(meta.options.headers).length
-      : 0,
-    actions: meta.options.actions?.length ?? 0,
-    proxy: meta.options.proxy,
-  });
 }

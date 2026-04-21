@@ -127,6 +127,15 @@ export class NoCachedDataError extends TransportableError {
   }
 }
 
+export class LockdownMissError extends TransportableError {
+  constructor() {
+    super(
+      "SCRAPE_LOCKDOWN_CACHE_MISS",
+      "Lockdown mode is enabled for this request, so only cached data from Firecrawl's index can be served. No cached version of this URL was available. To resolve this, disable lockdown mode to allow a live scrape, or try again later once this URL has been scraped and cached.",
+    );
+  }
+}
+
 export class ZDRViolationError extends TransportableError {
   constructor(public feature: string) {
     super(
