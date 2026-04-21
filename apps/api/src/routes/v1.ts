@@ -10,6 +10,7 @@ import { RateLimiterMode } from "../types";
 import expressWs from "express-ws";
 import { crawlStatusWSController } from "../controllers/v1/crawl-status-ws";
 import { crawlCancelController } from "../controllers/v1/crawl-cancel";
+import { crawlCompleteController } from "../controllers/v1/crawl-complete";
 import { scrapeStatusController } from "../controllers/v1/scrape-status";
 import { concurrencyCheckController } from "../controllers/v1/concurrency-check";
 import { batchScrapeController } from "../controllers/v1/batch-scrape";
@@ -266,10 +267,22 @@ v1Router.delete(
   crawlCancelController,
 );
 
+v1Router.post(
+  "/crawl/:jobId/complete",
+  authMiddleware(RateLimiterMode.CrawlStatus),
+  crawlCompleteController,
+);
+
 v1Router.delete(
   "/batch/scrape/:jobId",
   authMiddleware(RateLimiterMode.CrawlStatus),
   crawlCancelController,
+);
+
+v1Router.post(
+  "/batch/scrape/:jobId/complete",
+  authMiddleware(RateLimiterMode.CrawlStatus),
+  crawlCompleteController,
 );
 // v1Router.get("/checkJobStatus/:jobId", crawlJobStatusPreviewController);
 
