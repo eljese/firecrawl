@@ -95,7 +95,9 @@ module Firecrawl
       end
 
       parts << "--#{boundary}\r\n"
-      parts << %(Content-Disposition: form-data; name="#{file_field}"; filename="#{filename}"\r\n)
+      safe_file_field = file_field.to_s.gsub(/[\r\n"]/, "_")
+      safe_filename = filename.to_s.gsub(/[\r\n"]/, "_")
+      parts << %(Content-Disposition: form-data; name="#{safe_file_field}"; filename="#{safe_filename}"\r\n)
       parts << "Content-Type: #{content_type || "application/octet-stream"}\r\n\r\n"
       parts.force_encoding(Encoding::ASCII_8BIT)
       parts << content.to_s.dup.force_encoding(Encoding::ASCII_8BIT)
