@@ -148,6 +148,18 @@ function getUnsupportedParseOptionError(reqBody: ParseRequest): string | null {
     return "Parse uploads do not support actions.";
   }
 
+  if (hasFormatOfType(reqBody.formats, "screenshot")) {
+    return "Parse uploads do not support screenshot output.";
+  }
+
+  if (hasFormatOfType(reqBody.formats, "branding")) {
+    return "Parse uploads do not support branding output.";
+  }
+
+  if (hasFormatOfType(reqBody.formats, "changeTracking")) {
+    return "Parse uploads do not support change tracking.";
+  }
+
   if (reqBody.waitFor !== undefined && reqBody.waitFor > 0) {
     return "Parse uploads do not support waitFor.";
   }
@@ -162,18 +174,6 @@ function getUnsupportedParseOptionError(reqBody: ParseRequest): string | null {
 
   if (reqBody.proxy && reqBody.proxy !== "auto" && reqBody.proxy !== "basic") {
     return "Parse uploads only support proxy values of auto or basic.";
-  }
-
-  if (hasFormatOfType(reqBody.formats, "screenshot")) {
-    return "Parse uploads do not support screenshot output.";
-  }
-
-  if (hasFormatOfType(reqBody.formats, "branding")) {
-    return "Parse uploads do not support branding output.";
-  }
-
-  if (hasFormatOfType(reqBody.formats, "changeTracking")) {
-    return "Parse uploads do not support change tracking.";
   }
 
   return null;

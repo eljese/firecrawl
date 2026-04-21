@@ -269,13 +269,17 @@ mod tests {
         let file = ParseFile::from_bytes("empty.html", vec![]);
         let rt = tokio::runtime::Runtime::new().unwrap();
         let result = rt.block_on(async {
-            let client = Client::new_selfhosted("http://localhost:9999".to_string(), Some("k"))
-                .unwrap();
+            let client =
+                Client::new_selfhosted("http://localhost:9999".to_string(), Some("k")).unwrap();
             client.parse(file, None).await
         });
 
         assert!(result.is_err());
         let err_msg = format!("{}", result.unwrap_err());
-        assert!(err_msg.contains("empty"), "Expected empty file error, got: {}", err_msg);
+        assert!(
+            err_msg.contains("empty"),
+            "Expected empty file error, got: {}",
+            err_msg
+        );
     }
 }
