@@ -644,7 +644,10 @@ const extractTransformImpl = <T extends ScrapeOptionsBase | undefined>(
   }
 
   if (obj.lockdown && obj.maxAge === undefined) {
-    result = { ...result, maxAge: Number.MAX_SAFE_INTEGER };
+    // 100 years in ms. Number.MAX_SAFE_INTEGER lands ~285,000 years which
+    // overflows Postgres TIMESTAMP arithmetic in the index lookup and silently
+    // returns no rows. 100 years is "any cache, any age" for practical use.
+    result = { ...result, maxAge: 100 * 365 * 24 * 60 * 60 * 1000 };
   }
 
   return result as T extends undefined ? undefined : T;
