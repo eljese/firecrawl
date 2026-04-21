@@ -287,6 +287,15 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
         (doc.warning ? " " + doc.warning : "");
     }
 
+    if (
+      job.data.billing?.endpoint === "scrape" &&
+      (job.data.scrapeOptions.actions?.length ?? 0) > 0
+    ) {
+      doc.warning =
+        "You're using the actions parameter. For a more reliable and flexible experience, try the /interact endpoint instead." +
+        (doc.warning ? " " + doc.warning : "");
+    }
+
     const data = {
       success: true,
       result: {
@@ -519,6 +528,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
           credits_cost: credits_billed ?? 0,
           zeroDataRetention: job.data.zeroDataRetention,
           skipNuq: job.data.skipNuq ?? false,
+          is_parse: Boolean(job.data.internalOptions?.isParse),
         },
         true,
       );
@@ -602,6 +612,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
           credits_cost: credits_billed ?? 0,
           zeroDataRetention: job.data.zeroDataRetention,
           skipNuq: job.data.skipNuq ?? false,
+          is_parse: Boolean(job.data.internalOptions?.isParse),
         },
         false,
       );
@@ -777,6 +788,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
         credits_cost: credits_billed ?? 0,
         zeroDataRetention: job.data.zeroDataRetention,
         skipNuq: job.data.skipNuq ?? false,
+        is_parse: Boolean(job.data.internalOptions?.isParse),
       },
       true,
     );
