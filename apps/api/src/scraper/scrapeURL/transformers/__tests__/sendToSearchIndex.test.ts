@@ -1,8 +1,8 @@
-import { sendDocumentToSearchIndex } from "./sendToSearchIndex";
-import { indexDocumentIfEnabled } from "../../../lib/search-index-client";
-import { config } from "../../../config";
+import { sendDocumentToSearchIndex } from "../sendToSearchIndex";
+import { indexDocumentIfEnabled } from "../../../../lib/search-index-client";
+import { config } from "../../../../config";
 
-jest.mock("../../../lib/search-index-client", () => ({
+jest.mock("../../../../lib/search-index-client", () => ({
   indexDocumentIfEnabled: jest.fn(),
 }));
 

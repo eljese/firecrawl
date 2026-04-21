@@ -1,4 +1,4 @@
-import { fetchAudio } from "./audio";
+import { fetchAudio } from "../audio";
 
 describe("fetchAudio lockdown guard", () => {
   const originalFetch = global.fetch;

@@ -1,4 +1,4 @@
-import { shouldCheckRobots } from "./shouldCheckRobots";
+import { shouldCheckRobots } from "../shouldCheckRobots";
 
 describe("shouldCheckRobots", () => {
   it("returns false when lockdown is true, even if the team flag is set", () => {
