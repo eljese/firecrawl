@@ -266,57 +266,33 @@ export async function scrapeURLWithIndex(
 
   const checkpoint1 = Date.now();
 
-  const baseRpcParams = {
-    p_url_hash: urlHash,
-    p_max_age_ms: maxAge,
-    p_is_mobile: meta.options.mobile,
-    p_block_ads: meta.options.blockAds,
-    p_feature_screenshot: meta.featureFlags.has("screenshot"),
-    p_feature_screenshot_fullscreen: meta.featureFlags.has(
-      "screenshot@fullScreen",
-    ),
-    p_location_country: meta.options.location?.country ?? null,
-    p_location_languages:
-      (meta.options.location?.languages?.length ?? 0) > 0
-        ? meta.options.location?.languages
-        : null,
-    p_wait_time_ms: meta.options.waitFor,
-    p_min_age_ms: meta.options.minAge ?? null,
-  };
-
-  const requestedStealth = meta.featureFlags.has("stealthProxy");
-
-  // Lockdown silently auto-upgrades to stealthProxy on bot-protected sites, so
-  // most cached rows for popular URLs have is_stealth=true even when the user
-  // never asked for stealth. A strict is_stealth match would miss those rows.
-  // In lockdown mode we look up both stealth values and take whichever hits.
-  const stealthVariants = meta.options.lockdown
-    ? [false, true]
-    : [requestedStealth];
-
-  const responses = await Promise.all(
-    stealthVariants.map(p_is_stealth =>
-      index_supabase_service.rpc("index_get_recent_4", {
-        ...baseRpcParams,
-        p_is_stealth,
-      }),
-    ),
+  const { data, error } = await index_supabase_service.rpc(
+    "index_get_recent_4",
+    {
+      p_url_hash: urlHash,
+      p_max_age_ms: maxAge,
+      p_is_mobile: meta.options.mobile,
+      p_block_ads: meta.options.blockAds,
+      p_feature_screenshot: meta.featureFlags.has("screenshot"),
+      p_feature_screenshot_fullscreen: meta.featureFlags.has(
+        "screenshot@fullScreen",
+      ),
+      p_location_country: meta.options.location?.country ?? null,
+      p_location_languages:
+        (meta.options.location?.languages?.length ?? 0) > 0
+          ? meta.options.location?.languages
+          : null,
+      p_wait_time_ms: meta.options.waitFor,
+      p_is_stealth: meta.featureFlags.has("stealthProxy"),
+      p_min_age_ms: meta.options.minAge ?? null,
+    },
   );
 
-  const firstError = responses.find(r => r.error);
-  if (firstError?.error) {
+  if (error || !data) {
     throw new EngineError("Failed to retrieve URL from DB index", {
-      cause: firstError.error,
+      cause: error,
     });
   }
-
-  const data = responses
-    .map(r => r.data ?? [])
-    .flat()
-    .sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
 
   let selectedRow: {
     id: string;

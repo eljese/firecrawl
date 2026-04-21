@@ -69,41 +69,4 @@ describeIf(TEST_PRODUCTION)("V2 Scrape Lockdown Mode", () => {
     },
     scrapeTimeout,
   );
-
-  test(
-    "should hit cache with lockdown: true when the seed scrape used stealth proxy",
-    async () => {
-      const id = crypto.randomUUID();
-      const url = "https://firecrawl.dev/?testIdStealth=" + id;
-
-      // Seed via stealth proxy so the cached row is written with is_stealth=true.
-      // This mirrors what happens to popular bot-protected URLs whose silent
-      // auto-stealth retry stores rows the lockdown lookup must still find.
-      const seed = await scrape(
-        {
-          url,
-          proxy: "stealth",
-        },
-        identity,
-      );
-
-      expect(seed).toBeDefined();
-      expect(seed.metadata.cacheState).toBe("miss");
-
-      await new Promise(resolve => setTimeout(resolve, 20000));
-
-      const data = await scrape(
-        {
-          url,
-          lockdown: true,
-        },
-        identity,
-      );
-
-      expect(data).toBeDefined();
-      expect(data.metadata.cacheState).toBe("hit");
-      expect(data.metadata.cachedAt).toBeDefined();
-    },
-    scrapeTimeout * 2 + 20000,
-  );
 });
