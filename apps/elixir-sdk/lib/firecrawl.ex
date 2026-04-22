@@ -265,12 +265,14 @@ defmodule Firecrawl do
     delay: [type: {:or, [:integer, :float]}, doc: "Delay in seconds between scrapes. This helps respect website rate limits. Setting this forces concurrency to 1."],
     exclude_paths: [type: {:list, :string}, doc: "URL pathname regex patterns that exclude matching URLs from the crawl. For example, if you set \"excludePaths\": [\"blog/.*\"] for the base URL firecrawl.dev, any results matching that pattern will be excluded, such as https://www.firecrawl.dev/blog/firecrawl-launch-week-1-recap."],
     ignore_query_parameters: [type: :boolean, doc: "Do not re-scrape the same path with different (or none) query parameters"],
+    ignore_robots_txt: [type: :boolean, doc: "Ignore the website's robots.txt rules. Enterprise only — contact support@firecrawl.com to enable."],
     include_paths: [type: {:list, :string}, doc: "URL pathname regex patterns that include matching URLs in the crawl. Only the paths that match the specified patterns will be included in the response. Note: the starting URL is also checked against these patterns — if it does not match, the crawl may return 0 pages. For example, if you set \"includePaths\": [\"blog/.*\"] for the base URL firecrawl.dev/blog, only pages under /blog/ will be included in the results, such as https://www.firecrawl.dev/blog/firecrawl-launch-week-1-recap."],
     limit: [type: :integer, doc: "Maximum number of pages to crawl. Default limit is 10000."],
     max_concurrency: [type: :integer, doc: "Maximum number of concurrent scrapes. This parameter allows you to set a concurrency limit for this crawl. If not specified, the crawl adheres to your team's concurrency limit."],
     max_discovery_depth: [type: :integer, doc: "Maximum depth to crawl based on discovery order. The root site and sitemapped pages has a discovery depth of 0. For example, if you set it to 1, and you set `sitemap: 'skip'`, you will only crawl the entered URL and all URLs that are linked on that page."],
     prompt: [type: :string, doc: "A prompt to use to generate the crawler options (all the parameters below) from natural language. Explicitly set parameters will override the generated equivalents."],
     regex_on_full_url: [type: :boolean, doc: "When true, includePaths and excludePaths regex patterns are matched against the full URL (including query parameters) instead of just the URL pathname. Useful when you need to filter URLs based on query strings."],
+    robots_user_agent: [type: :string, doc: "Custom User-Agent string for robots.txt evaluation. When set, robots.txt is fetched with this User-Agent and allow/disallow rules are matched against it instead of the default. Enterprise only — contact support@firecrawl.com to enable."],
     scrape_options: [type: :keyword_list],
     sitemap: [type: {:in, [:skip, :include, :only]}, doc: "Sitemap mode when crawling. If you set it to 'skip', the crawler will ignore the website sitemap and only crawl the entered URL and discover pages from there onwards. If you set it to 'only', the crawler will only crawl URLs from the sitemap (plus the start URL) and will not discover links from HTML."],
     url: [type: :string, required: true, doc: "The base URL to start crawling from"],
@@ -278,7 +280,7 @@ defmodule Firecrawl do
     zero_data_retention: [type: :boolean, doc: "If true, this will enable zero data retention for this crawl. To enable this feature, please contact help@firecrawl.dev"]
   ])
 
-  @crawl_urls_key_mapping %{allow_external_links: "allowExternalLinks", allow_subdomains: "allowSubdomains", crawl_entire_domain: "crawlEntireDomain", delay: "delay", exclude_paths: "excludePaths", ignore_query_parameters: "ignoreQueryParameters", include_paths: "includePaths", limit: "limit", max_concurrency: "maxConcurrency", max_discovery_depth: "maxDiscoveryDepth", prompt: "prompt", regex_on_full_url: "regexOnFullURL", scrape_options: "scrapeOptions", sitemap: "sitemap", url: "url", webhook: "webhook", zero_data_retention: "zeroDataRetention"}
+  @crawl_urls_key_mapping %{allow_external_links: "allowExternalLinks", allow_subdomains: "allowSubdomains", crawl_entire_domain: "crawlEntireDomain", delay: "delay", exclude_paths: "excludePaths", ignore_query_parameters: "ignoreQueryParameters", ignore_robots_txt: "ignoreRobotsTxt", include_paths: "includePaths", limit: "limit", max_concurrency: "maxConcurrency", max_discovery_depth: "maxDiscoveryDepth", prompt: "prompt", regex_on_full_url: "regexOnFullURL", robots_user_agent: "robotsUserAgent", scrape_options: "scrapeOptions", sitemap: "sitemap", url: "url", webhook: "webhook", zero_data_retention: "zeroDataRetention"}
 
   @doc """
   Crawl multiple URLs based on options
@@ -1024,7 +1026,7 @@ defmodule Firecrawl do
     country: [type: :string, doc: "ISO country code for geo-targeting search results (e.g. `US`). For best results, set both this and the `location` parameter."],
     enterprise: [type: {:list, :string}, doc: "Enterprise search options for Zero Data Retention (ZDR). Use `[\"zdr\"]` for end-to-end ZDR (10 credits / 10 results) or `[\"anon\"]` for anonymized ZDR (2 credits / 10 results). Must be enabled for your team."],
     ignore_invalid_urls: [type: :boolean, doc: "Excludes URLs from the search results that are invalid for other Firecrawl endpoints. This helps reduce errors if you are piping data from search into other Firecrawl API endpoints."],
-    limit: [type: :integer, doc: "Maximum number of results to return"],
+    limit: [type: :integer, doc: "Maximum number of results to return (per source type when using multiple sources)"],
     location: [type: :string, doc: "Location parameter for search results (e.g. `San Francisco,California,United States`). For best results, set both this and the `country` parameter."],
     query: [type: :string, required: true, doc: "The search query"],
     scrape_options: [type: :keyword_list, doc: "Options for scraping search results"],
