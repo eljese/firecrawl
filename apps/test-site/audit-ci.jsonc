@@ -1,4 +1,12 @@
 {
     "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
-    "low": true
+    "low": true,
+    // GHSA-j687-52p2-xcff: Astro XSS via define:vars sanitization bypass.
+    // Patched in astro@6.1.6 (major upgrade from current 5.x).
+    // Not exploitable here: this app uses output: 'static' (no SSR) and has no
+    // define:vars usage. Temporarily allowlisted while we plan the astro 5 -> 6
+    // major upgrade. Expires: 2026-07-21.
+    "allowlist": [
+        "GHSA-j687-52p2-xcff"
+    ]
 }
