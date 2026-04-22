@@ -13,7 +13,6 @@ overrides:
   brace-expansion: '>=5.0.5'
   axios@<1.15.0: 1.15.0
   follow-redirects@<1.16.0: '>=1.16.0 <2.0.0'
-  uuid: ^14.0.0
 
 importers:
 
@@ -69,8 +68,8 @@ importers:
         specifier: ^5.4.5
         version: 5.8.3
       uuid:
-        specifier: ^14.0.0
-        version: 14.0.0
+        specifier: ^9.0.1
+        version: 9.0.1
 
 packages:
 
@@ -1961,8 +1960,8 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
-  uuid@14.0.0:
-    resolution: {integrity: sha512-Qo+uWgilfSmAhXCMav1uYFynlQO7fMFiMVZsQqZRMIXp0O7rR7qjkj+cPvBHLgBqi960QCoo/PH2/6ZtVqKvrg==}
+  uuid@9.0.1:
+    resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
     hasBin: true
 
   v8-to-istanbul@9.3.0:
@@ -4069,7 +4068,7 @@ snapshots:
       escalade: 3.2.0
       picocolors: 1.1.1
 
-  uuid@14.0.0: {}
+  uuid@9.0.1: {}
 
   v8-to-istanbul@9.3.0:
     dependencies:
