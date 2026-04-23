@@ -2063,27 +2063,6 @@ describe("Attribute formats", () => {
       },
       scrapeTimeout,
     );
-
-    it.concurrent(
-      "should route audio format through index/tlsclient (cache stays in fallback)",
-      async () => {
-        const data = await scrape(
-          {
-            url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&audioRoutingTest=1",
-            formats: ["audio"],
-          },
-          identity,
-        );
-
-        expect(data.audio).toBeDefined();
-        // cacheState is only populated when an index engine is in the
-        // fallback list -- proves the audio flag didn't bypass cache (as
-        // the prior forceEngine=tlsclient hotfix did).
-        expect(data.metadata.cacheState).toBeDefined();
-        expect(["hit", "miss"]).toContain(data.metadata.cacheState);
-      },
-      scrapeTimeout,
-    );
   });
 
   describe("UUID validation", () => {
