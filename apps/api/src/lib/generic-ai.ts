@@ -19,7 +19,7 @@ type Provider =
   | "fireworks"
   | "deepinfra"
   | "vertex";
-const defaultProvider: Provider = config.OLLAMA_BASE_URL ? "ollama" : "openai";
+const defaultProvider: Provider = (config.LLM_PROVIDER as Provider) || (config.OLLAMA_BASE_URL ? "ollama" : "openai");
 
 const providerList: Record<Provider, any> = {
   openai: createOpenAI({
@@ -27,7 +27,9 @@ const providerList: Record<Provider, any> = {
     baseURL: config.OPENAI_BASE_URL,
     // @ts-ignore
       compatibility: "compatible",
-  }), //OPENAI_API_KEY
+   // @ts-ignore
+      compatibility: "strict",
+    }), //OPENAI_API_KEY
   ollama: createOllama({
     baseURL: config.OLLAMA_BASE_URL,
   }),
@@ -60,12 +62,10 @@ export function getModel(name: string, provider: Provider = defaultProvider) {
     name = "gemini-2.5-pro";
   }
   const modelName = config.MODEL_NAME || name;
-  const useResponsesEndpoint = process.env.USE_RESPONSES_ENDPOINT !== "false";
+  const useResponsesEndpoint = config.USE_RESPONSES_ENDPOINT !== false;
 
-  if (provider === "openai") {
-    if (modelName.startsWith("o3-mini") || !useResponsesEndpoint) {
-      return providerList.openai.chat(modelName);
-    }
+  if (provider === "openai" && !useResponsesEndpoint) {
+    return providerList.openai.chat(modelName);
   }
 
   return providerList[provider](modelName);
