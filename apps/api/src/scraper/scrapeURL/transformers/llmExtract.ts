@@ -40,6 +40,21 @@ function detectRecursiveSchema(schema: any): boolean {
   return hasRefs || hasDefs;
 }
 
+
+function sanitizeSchema(schema: any): any {
+  if (!schema || typeof schema !== "object") return schema;
+  if (Array.isArray(schema)) return schema.map(sanitizeSchema);
+  const newSchema: any = {};
+  for (const key in schema) {
+    if (key === "type" && Array.isArray(schema[key])) {
+      newSchema[key] = schema[key].includes("string") ? "string" : schema[key][0];
+    } else {
+      newSchema[key] = sanitizeSchema(schema[key]);
+    }
+  }
+  return newSchema;
+}
+
 function selectModelForSchema(schema?: any): {
   modelName: string;
   reason: string;
@@ -718,7 +733,7 @@ export async function generateCompletions({
       },
       system: options.systemPrompt,
       ...(schema && {
-        schema: schema instanceof z.ZodType ? schema : jsonSchema(schema),
+        schema: schema instanceof z.ZodType ? schema : jsonSchema(sanitizeSchema(schema)),
       }),
       ...(!schema && { output: "no-schema" as const }),
       ...repairConfig,
