@@ -21,7 +21,11 @@ import {
 } from "../../../../controllers/v2/types";
 import type { PDFMode } from "../../../../controllers/v2/types";
 import { processPdf, detectPdf } from "@mendable/firecrawl-rs";
-import { MAX_FILE_SIZE, MILLISECONDS_PER_PAGE } from "./types";
+import {
+  FIRE_PDF_MAX_FILE_SIZE,
+  MAX_FILE_SIZE,
+  MILLISECONDS_PER_PAGE,
+} from "./types";
 import type { PDFProcessorResult } from "./types";
 import {
   emitNativeLogs,
@@ -371,7 +375,7 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
         (!routeToMinerU &&
           config.FIRE_PDF_ENABLE &&
           config.FIRE_PDF_BASE_URL &&
-          base64Content.length < MAX_FILE_SIZE &&
+          base64Content.length < FIRE_PDF_MAX_FILE_SIZE &&
           Math.random() * 100 < config.FIRE_PDF_PERCENT);
 
       if (useFirePDF) {
