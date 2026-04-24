@@ -19,17 +19,14 @@ type Provider =
   | "fireworks"
   | "deepinfra"
   | "vertex";
+
 const defaultProvider: Provider = (config.LLM_PROVIDER as Provider) || (config.OLLAMA_BASE_URL ? "ollama" : "openai");
 
 const providerList: Record<Provider, any> = {
   openai: createOpenAI({
     apiKey: config.OPENAI_API_KEY,
     baseURL: config.OPENAI_BASE_URL,
-    // @ts-ignore
-      compatibility: "compatible",
-   // @ts-ignore
-      compatibility: "strict",
-    }), //OPENAI_API_KEY
+  }), //OPENAI_API_KEY
   ollama: createOllama({
     baseURL: config.OLLAMA_BASE_URL,
   }),
@@ -62,6 +59,8 @@ export function getModel(name: string, provider: Provider = defaultProvider) {
     name = "gemini-2.5-pro";
   }
   const modelName = config.MODEL_NAME || name;
+  
+  // Force legacy chat completions endpoint if USE_RESPONSES_ENDPOINT is false
   const useResponsesEndpoint = config.USE_RESPONSES_ENDPOINT !== false;
 
   if (provider === "openai" && !useResponsesEndpoint) {
