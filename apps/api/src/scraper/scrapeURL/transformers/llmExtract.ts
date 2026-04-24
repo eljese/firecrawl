@@ -41,12 +41,15 @@ function detectRecursiveSchema(schema: any): boolean {
 }
 
 
+
 function sanitizeSchema(schema: any): any {
   if (!schema || typeof schema !== "object") return schema;
   if (Array.isArray(schema)) return schema.map(sanitizeSchema);
+  
   const newSchema: any = {};
   for (const key in schema) {
     if (key === "type" && Array.isArray(schema[key])) {
+      // Flatten [type, "null"] to just type. Prefer string if available.
       newSchema[key] = schema[key].includes("string") ? "string" : schema[key][0];
     } else {
       newSchema[key] = sanitizeSchema(schema[key]);
@@ -54,6 +57,7 @@ function sanitizeSchema(schema: any): any {
   }
   return newSchema;
 }
+
 
 function selectModelForSchema(schema?: any): {
   modelName: string;
