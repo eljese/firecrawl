@@ -365,19 +365,21 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
     // unless we explicitly routed to MinerU via MINERU_PERCENT.
     const skipOCR = rustEnabled && mode === "fast" && !routeToMinerU;
     if (!result && !skipOCR) {
-      const base64Content = (await readFile(tempFilePath)).toString("base64");
+      const pdfBuffer = await readFile(tempFilePath);
+      const fileSizeBytes = pdfBuffer.length;
+      const base64Content = pdfBuffer.toString("base64");
 
       if (
         !routeToMinerU &&
         config.FIRE_PDF_ENABLE &&
         config.FIRE_PDF_BASE_URL &&
-        base64Content.length >= FIRE_PDF_MAX_FILE_SIZE
+        fileSizeBytes >= FIRE_PDF_MAX_FILE_SIZE
       ) {
         meta.logger.warn("PDF skipped by Fire PDF: exceeds size cap", {
           method: "scrapePDF",
           event: "pdf_skipped_size",
           engine: "firepdf",
-          base64_size_bytes: base64Content.length,
+          file_size_bytes: fileSizeBytes,
           max_size_bytes: FIRE_PDF_MAX_FILE_SIZE,
           scrape_id: meta.id,
           team_id: meta.internalOptions.teamId,
@@ -392,7 +394,7 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
         (!routeToMinerU &&
           config.FIRE_PDF_ENABLE &&
           config.FIRE_PDF_BASE_URL &&
-          base64Content.length < FIRE_PDF_MAX_FILE_SIZE &&
+          fileSizeBytes < FIRE_PDF_MAX_FILE_SIZE &&
           Math.random() * 100 < config.FIRE_PDF_PERCENT);
 
       if (useFirePDF) {
@@ -448,7 +450,7 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
       if (
         !result &&
         !forceFirePDF &&
-        base64Content.length >= MAX_FILE_SIZE &&
+        fileSizeBytes >= MAX_FILE_SIZE &&
         config.RUNPOD_MU_API_KEY &&
         config.RUNPOD_MU_POD_ID
       ) {
@@ -456,7 +458,7 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
           method: "scrapePDF",
           event: "pdf_skipped_size",
           engine: "mineru",
-          base64_size_bytes: base64Content.length,
+          file_size_bytes: fileSizeBytes,
           max_size_bytes: MAX_FILE_SIZE,
           scrape_id: meta.id,
           team_id: meta.internalOptions.teamId,
@@ -466,7 +468,7 @@ export async function scrapePDF(meta: Meta): Promise<EngineScrapeResult> {
       if (
         !result &&
         !forceFirePDF &&
-        base64Content.length < MAX_FILE_SIZE &&
+        fileSizeBytes < MAX_FILE_SIZE &&
         config.RUNPOD_MU_API_KEY &&
         config.RUNPOD_MU_POD_ID
       ) {
