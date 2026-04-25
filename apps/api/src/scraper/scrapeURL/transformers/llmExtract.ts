@@ -309,7 +309,43 @@ export type GenerateCompletionsOptions = {
     llmsTxtId?: string;
   };
 };
-export async function generateCompletions({
+export 
+async function generateObject(config: any): Promise<any> {
+  try {
+    return await aiGenerateObject(config);
+  } catch (error: any) {
+    if (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError" || error.name === "NoObjectGeneratedError") {
+      const modelId = (config.model as any).modelId || "";
+      if (modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("gpt-3.5-turbo")) {
+        const { text } = await generateText({
+          model: config.model,
+          prompt: config.prompt,
+          system: config.system,
+        });
+        let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        cleaned = cleaned.replace(/```json\n?([\s\S]*?)n?```/g, "$1").trim();
+        cleaned = cleaned.replace(/```[\s\S]*?\n?([\s\S]*?)n?```/g, "$1").trim();
+        if (cleaned.includes("{") && cleaned.indexOf("{") >= 0) {
+            cleaned = cleaned.substring(cleaned.indexOf("{"));
+        }
+        if (cleaned.includes("}") && cleaned.lastIndexOf("}") >= 0) {
+            cleaned = cleaned.substring(0, cleaned.lastIndexOf("}") + 1);
+        }
+        try {
+          return {
+            object: JSON.parse(cleaned),
+            usage: { totalTokens: 0 },
+          };
+        } catch (innerError) {
+          throw error;
+        }
+      }
+    }
+    throw error;
+  }
+}
+
+async function generateCompletions({
   logger,
   options,
   markdown,
