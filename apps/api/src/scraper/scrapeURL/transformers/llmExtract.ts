@@ -313,7 +313,44 @@ export type GenerateCompletionsOptions = {
     llmsTxtId?: string;
   };
 };
-export async function generateCompletions({
+export 
+async function generateObject(config: any): Promise<any> {
+  try {
+    return await aiGenerateObject(config);
+  } catch (error: any) {
+    // Minimax / DeepSeek-style thinking tag handling
+    if (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError") {
+      const model = config.model;
+      const modelId = (model as any).modelId || "";
+      
+      if (modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("gpt-3.5-turbo")) {
+        console.log("Detected JSON parse error with Minimax, attempting repair...");
+        const { text } = await generateText({
+          model: config.model,
+          prompt: config.prompt,
+          system: config.system,
+        });
+
+        // Strip <think>...</think> and markdown code blocks
+        let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        cleaned = cleaned.replace(/```json\n?([\s\S]*?)n?```/g, "$1").trim();
+        cleaned = cleaned.replace(/```\n?([\s\S]*?)n?```/g, "$1").trim();
+
+        try {
+          return {
+            object: JSON.parse(cleaned),
+            usage: {}, // Text generation usage is different, we'll let Firecrawl estimate it
+          };
+        } catch (innerError) {
+          throw error; // Re-throw original if repair fails
+        }
+      }
+    }
+    throw error;
+  }
+}
+
+async function generateCompletions({
   logger,
   options,
   markdown,
