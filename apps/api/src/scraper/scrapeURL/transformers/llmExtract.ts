@@ -309,7 +309,7 @@ export type GenerateCompletionsOptions = {
     llmsTxtId?: string;
   };
 };
-export 
+
 async function generateObject(config: any): Promise<any> {
   try {
     return await aiGenerateObject(config);
@@ -345,7 +345,7 @@ async function generateObject(config: any): Promise<any> {
   }
 }
 
-async function generateCompletions({
+export async function generateCompletions({
   logger,
   options,
   markdown,
