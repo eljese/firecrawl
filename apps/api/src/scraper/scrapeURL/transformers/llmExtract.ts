@@ -11,7 +11,7 @@ import { logger } from "../../../lib/logger";
 import { modelPrices } from "../../../lib/extract/usage/model-prices";
 import {
   AISDKError,
-  generateObject,
+  aiGenerateObject,
   generateText,
   LanguageModel,
   NoObjectGeneratedError,
@@ -314,7 +314,7 @@ export type GenerateCompletionsOptions = {
   };
 };
 export 
-async function generateObject(config: any): Promise<any> {
+async function aiGenerateObject(config: any): Promise<any> {
   try {
     return await aiGenerateObject(config);
   } catch (error: any) {
@@ -751,7 +751,7 @@ async function generateCompletions({
       },
     };
 
-    const generateObjectConfig = {
+    const aiGenerateObjectConfig = {
       model: currentModel,
       prompt: prompt,
       providerOptions: {
@@ -820,19 +820,19 @@ async function generateCompletions({
             temperature: 1,
           }
         : {}),
-    } satisfies Parameters<typeof generateObject>[0];
+    } satisfies Parameters<typeof aiGenerateObject>[0];
 
     // const now = new Date().getTime();
     // await fs.writeFile(
-    //   `logs/generateObjectConfig-${now}.json`,
-    //   JSON.stringify(generateObjectConfig, null, 2),
+    //   `logs/aiGenerateObjectConfig-${now}.json`,
+    //   JSON.stringify(aiGenerateObjectConfig, null, 2),
     // );
 
     logger.debug("Generating object...", {
-      generateObjectConfig: {
-        ...generateObjectConfig,
-        prompt: generateObjectConfig.prompt.slice(0, 100) + "...",
-        system: generateObjectConfig.system?.slice(0, 100) + "...",
+      aiGenerateObjectConfig: {
+        ...aiGenerateObjectConfig,
+        prompt: aiGenerateObjectConfig.prompt.slice(0, 100) + "...",
+        system: aiGenerateObjectConfig.system?.slice(0, 100) + "...",
       },
       model,
       retryModel,
@@ -849,13 +849,13 @@ async function generateCompletions({
         }
       | undefined;
     try {
-      result = await generateObject(generateObjectConfig);
+      result = await aiGenerateObject(aiGenerateObjectConfig);
       costTrackingOptions.costTracking.addCall({
         type: "other",
         metadata: {
           ...costTrackingOptions.metadata,
-          gcDetails: "generateObject",
-          gcModel: generateObjectConfig.model.modelId,
+          gcDetails: "aiGenerateObject",
+          gcModel: aiGenerateObjectConfig.model.modelId,
         },
         tokens: {
           input: result.usage?.inputTokens ?? 0,
@@ -885,15 +885,15 @@ async function generateCompletions({
             : currentModel.modelId;
         try {
           const retryConfig = {
-            ...generateObjectConfig,
+            ...aiGenerateObjectConfig,
             model: currentModel,
           };
-          result = await generateObject(retryConfig);
+          result = await aiGenerateObject(retryConfig);
           costTrackingOptions.costTracking.addCall({
             type: "other",
             metadata: {
               ...costTrackingOptions.metadata,
-              gcDetails: "generateObject fallback",
+              gcDetails: "aiGenerateObject fallback",
               gcModel: retryConfig.model.modelId,
             },
             tokens: {
@@ -961,9 +961,9 @@ async function generateCompletions({
       extract = extract?.items;
     }
 
-    // Since generateObject doesn't provide token usage, we'll estimate it
+    // Since aiGenerateObject doesn't provide token usage, we'll estimate it
     if (!result) {
-      throw new Error("generateObject returned undefined result");
+      throw new Error("aiGenerateObject returned undefined result");
     }
     const promptTokens = result.usage?.inputTokens ?? 0;
     const completionTokens = result.usage?.outputTokens ?? 0;
