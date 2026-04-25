@@ -302,8 +302,10 @@ export type GenerateCompletionsOptions = {
     llmsTxtId?: string;
   };
 };
-export 
- catch (error: any) {
+async function generateObject(config: any): Promise<any> {
+  try {
+    return await aiGenerateObject(config);
+  } catch (error: any) {
     // Minimax / DeepSeek-style thinking tag handling
     if (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError") {
       const model = config.model;
