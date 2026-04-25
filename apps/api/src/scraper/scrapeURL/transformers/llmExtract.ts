@@ -1,17 +1,6 @@
-import { encoding_for_model } from "@dqbd/tiktoken";
-import { TiktokenModel } from "@dqbd/tiktoken";
-import {
-  Document,
-  JsonFormatWithOptions,
-  TokenUsage,
-} from "../../../controllers/v2/types";
-import { Logger } from "winston";
-import { Meta } from "..";
-import { logger } from "../../../lib/logger";
-import { modelPrices } from "../../../lib/extract/usage/model-prices";
 import {
   AISDKError,
-  generateObject as aiGenerateObject, generateText,
+  generateObject as aiGenerateObject,
   generateText,
   LanguageModel,
   NoObjectGeneratedError,
@@ -1573,13 +1562,6 @@ async function generateObject(config: any): Promise<any> {
   const isMinimax = modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("gpt-3.5-turbo");
 
   if (isMinimax) {
-    console.log("[DEBUG] Minimax detected, applying aggressive pre-processing...");
-    if (config.schema && !(config.schema instanceof z.ZodType)) {
-        // config.schema might be an AI SDK jsonSchema wrapper, but let's try to reach the underlying schema if possible
-        // Actually, if it's already wrapped in jsonSchema(), we might not be able to mutate it easily.
-        // But in Firecrawl, it's often passed raw to generateObject.
-    }
-    
     // Reinforce system prompt
     const noThink = "\nIMPORTANT: OUTPUT ONLY RAW JSON. DO NOT include <think> tags. DO NOT include markdown blocks. START your response with '{'.";
     if (config.system) {
@@ -1587,49 +1569,35 @@ async function generateObject(config: any): Promise<any> {
     } else {
         config.system = noThink;
     }
-
-    // Disable strict mode for Minimax (OpenAI compatibility)
+    // Disable strict mode for Minimax
     if (config.providerOptions?.openai) {
         config.providerOptions.openai.strictJsonSchema = false;
     }
   }
 
   try {
-    const result = await aiGenerateObject(config);
-    return result;
+    return await aiGenerateObject(config);
   } catch (error: any) {
     if (isMinimax && (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError" || error.name === "NoObjectGeneratedError" || error.statusCode === 400)) {
-      console.log(`[DEBUG] Minimax error ${error.name} (Status: ${error.statusCode}), attempting repair via generateText...`);
-      
-      // Fallback: Use generateText to get raw string and parse it manually
+      console.log(`[DEBUG] Minimax error ${error.name}, attempting manual repair...`);
       const { text } = await generateText({
         model: config.model,
         prompt: config.prompt,
         system: config.system,
       });
 
-      console.log("[DEBUG] Raw text from fallback:", text.substring(0, 100) + "...");
-
       let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
       cleaned = cleaned.replace(/```json\n?([\s\S]*?)n?```/g, "$1").trim();
       cleaned = cleaned.replace(/```[\s\S]*?\n?([\s\S]*?)n?```/g, "$1").trim();
-      
-      if (cleaned.includes("{") && cleaned.indexOf("{") >= 0) {
-          cleaned = cleaned.substring(cleaned.indexOf("{"));
-      }
-      if (cleaned.includes("}") && cleaned.lastIndexOf("}") >= 0) {
-          cleaned = cleaned.substring(0, cleaned.lastIndexOf("}") + 1);
-      }
+      if (cleaned.includes("{") && cleaned.indexOf("{") >= 0) cleaned = cleaned.substring(cleaned.indexOf("{"));
+      if (cleaned.includes("}") && cleaned.lastIndexOf("}") >= 0) cleaned = cleaned.substring(0, cleaned.lastIndexOf("}") + 1);
 
       try {
-        const parsed = JSON.parse(cleaned);
-        console.log("[DEBUG] Repair successful!");
         return {
-          object: parsed,
+          object: JSON.parse(cleaned),
           usage: { totalTokens: 0 },
         };
       } catch (innerError) {
-        console.log("[DEBUG] Repair failed: " + innerError.message);
         throw error;
       }
     }
