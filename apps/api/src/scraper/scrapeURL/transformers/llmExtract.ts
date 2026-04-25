@@ -1,3 +1,14 @@
+import { encoding_for_model } from "@dqbd/tiktoken";
+import { TiktokenModel } from "@dqbd/tiktoken";
+import {
+  Document,
+  JsonFormatWithOptions,
+  TokenUsage,
+} from "../../../controllers/v2/types";
+import { Logger } from "winston";
+import { Meta } from "..";
+import { logger } from "../../../lib/logger";
+import { modelPrices } from "../../../lib/extract/usage/model-prices";
 import {
   AISDKError,
   generateObject as aiGenerateObject,
@@ -30,15 +41,12 @@ function detectRecursiveSchema(schema: any): boolean {
 }
 
 
-
 function sanitizeSchema(schema: any): any {
   if (!schema || typeof schema !== "object") return schema;
   if (Array.isArray(schema)) return schema.map(sanitizeSchema);
-  
   const newSchema: any = {};
   for (const key in schema) {
     if (key === "type" && Array.isArray(schema[key])) {
-      // Flatten [type, "null"] to just type. Prefer string if available.
       newSchema[key] = schema[key].includes("string") ? "string" : schema[key][0];
     } else {
       newSchema[key] = sanitizeSchema(schema[key]);
@@ -46,7 +54,6 @@ function sanitizeSchema(schema: any): any {
   }
   return newSchema;
 }
-
 
 function selectModelForSchema(schema?: any): {
   modelName: string;
@@ -302,43 +309,7 @@ export type GenerateCompletionsOptions = {
     llmsTxtId?: string;
   };
 };
-async function generateObject(config: any): Promise<any> {
-  try {
-    return await generateObject(config);
-  } catch (error: any) {
-    // Minimax / DeepSeek-style thinking tag handling
-    if (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError") {
-      const model = config.model;
-      const modelId = (model as any).modelId || "";
-      
-      if (modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("gpt-3.5-turbo")) {
-        console.log("Detected JSON parse error with Minimax, attempting repair...");
-        const { text } = await generateText({
-          model: config.model,
-          prompt: config.prompt,
-          system: config.system,
-        });
-
-        // Strip <think>...</think> and markdown code blocks
-        let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-        cleaned = cleaned.replace(/```json\n?([\s\S]*?)n?```/g, "$1").trim();
-        cleaned = cleaned.replace(/```\n?([\s\S]*?)n?```/g, "$1").trim();
-
-        try {
-          return {
-            object: JSON.parse(cleaned),
-            usage: {}, // Text generation usage is different, we'll let Firecrawl estimate it
-          };
-        } catch (innerError) {
-          throw error; // Re-throw original if repair fails
-        }
-      }
-    }
-    throw error;
-  }
-}
-
-async function generateCompletions({
+export async function generateCompletions({
   logger,
   options,
   markdown,
@@ -441,13 +412,11 @@ async function generateCompletions({
             gcDetails: "no-object",
           },
           model: modelId,
-          // @ts-ignore
           cost: calculateCost(
             modelId,
             result?.usage?.inputTokens ?? 0,
             result?.usage?.outputTokens ?? 0,
           ),
-          // @ts-ignore
           tokens: {
             input: result?.usage?.inputTokens ?? 0,
             output: result?.usage?.outputTokens ?? 0,
@@ -552,14 +521,12 @@ async function generateCompletions({
                 gcDetails: "no-object fallback",
               },
               model: modelId,
-              // @ts-ignore
-          cost: calculateCost(
+              cost: calculateCost(
                 modelId,
                 result?.usage?.inputTokens ?? 0,
                 result?.usage?.outputTokens ?? 0,
               ),
-              // @ts-ignore
-          tokens: {
+              tokens: {
                 input: result?.usage?.inputTokens ?? 0,
                 output: result?.usage?.outputTokens ?? 0,
               },
@@ -722,15 +689,13 @@ async function generateCompletions({
               ...costTrackingOptions.metadata,
               gcDetails: "repairConfig",
             },
-            // @ts-ignore
-          cost: calculateCost(
+            cost: calculateCost(
               modelId,
               repairUsage?.inputTokens ?? 0,
               repairUsage?.outputTokens ?? 0,
             ),
             model: modelId,
-            // @ts-ignore
-          tokens: {
+            tokens: {
               input: repairUsage?.inputTokens ?? 0,
               output: repairUsage?.outputTokens ?? 0,
             },
@@ -745,7 +710,7 @@ async function generateCompletions({
       },
     };
 
-    const aiGenerateObjectConfig = {
+    const generateObjectConfig = {
       model: currentModel,
       prompt: prompt,
       providerOptions: {
@@ -814,19 +779,19 @@ async function generateCompletions({
             temperature: 1,
           }
         : {}),
-    } satisfies Parameters<typeof aiGenerateObject>[0];
+    } satisfies Parameters<typeof generateObject>[0];
 
     // const now = new Date().getTime();
     // await fs.writeFile(
-    //   `logs/aiGenerateObjectConfig-${now}.json`,
-    //   JSON.stringify(aiGenerateObjectConfig, null, 2),
+    //   `logs/generateObjectConfig-${now}.json`,
+    //   JSON.stringify(generateObjectConfig, null, 2),
     // );
 
     logger.debug("Generating object...", {
-      aiGenerateObjectConfig: {
-        ...aiGenerateObjectConfig,
-        prompt: aiGenerateObjectConfig.prompt.slice(0, 100) + "...",
-        system: aiGenerateObjectConfig.system?.slice(0, 100) + "...",
+      generateObjectConfig: {
+        ...generateObjectConfig,
+        prompt: generateObjectConfig.prompt.slice(0, 100) + "...",
+        system: generateObjectConfig.system?.slice(0, 100) + "...",
       },
       model,
       retryModel,
@@ -843,22 +808,20 @@ async function generateCompletions({
         }
       | undefined;
     try {
-      result = await generateObject(aiGenerateObjectConfig);
+      result = await generateObject(generateObjectConfig);
       costTrackingOptions.costTracking.addCall({
         type: "other",
         metadata: {
           ...costTrackingOptions.metadata,
-          gcDetails: "aiGenerateObject",
-          gcModel: aiGenerateObjectConfig.model.modelId,
+          gcDetails: "generateObject",
+          gcModel: generateObjectConfig.model.modelId,
         },
-        // @ts-ignore
-          tokens: {
+        tokens: {
           input: result?.usage?.inputTokens ?? 0,
           output: result?.usage?.outputTokens ?? 0,
         },
         model: modelId,
-        // @ts-ignore
-          cost: calculateCost(
+        cost: calculateCost(
           modelId,
           result?.usage?.inputTokens ?? 0,
           result?.usage?.outputTokens ?? 0,
@@ -881,7 +844,7 @@ async function generateCompletions({
             : currentModel.modelId;
         try {
           const retryConfig = {
-            ...aiGenerateObjectConfig,
+            ...generateObjectConfig,
             model: currentModel,
           };
           result = await generateObject(retryConfig);
@@ -889,17 +852,15 @@ async function generateCompletions({
             type: "other",
             metadata: {
               ...costTrackingOptions.metadata,
-              gcDetails: "aiGenerateObject fallback",
+              gcDetails: "generateObject fallback",
               gcModel: retryConfig.model.modelId,
             },
-            // @ts-ignore
-          tokens: {
+            tokens: {
               input: result?.usage?.inputTokens ?? 0,
               output: result?.usage?.outputTokens ?? 0,
             },
             model: modelId,
-            // @ts-ignore
-          cost: calculateCost(
+            cost: calculateCost(
               modelId,
               result?.usage?.inputTokens ?? 0,
               result?.usage?.outputTokens ?? 0,
@@ -959,9 +920,9 @@ async function generateCompletions({
       extract = extract?.items;
     }
 
-    // Since aiGenerateObject doesn't provide token usage, we'll estimate it
+    // Since generateObject doesn't provide token usage, we'll estimate it
     if (!result) {
-      throw new Error("aiGenerateObject returned undefined result");
+      throw new Error("generateObject returned undefined result");
     }
     const promptTokens = result?.usage?.inputTokens ?? 0;
     const completionTokens = result?.usage?.outputTokens ?? 0;
