@@ -11,7 +11,7 @@ import { logger } from "../../../lib/logger";
 import { modelPrices } from "../../../lib/extract/usage/model-prices";
 import {
   AISDKError,
-  generateObject as aiGenerateObject, generateText,
+  generateObject as aiGenerateObject,
   generateText,
   LanguageModel,
   NoObjectGeneratedError,
@@ -342,8 +342,7 @@ async function generateObject(config: any): Promise<any> {
     throw error;
   }
 }
-
-export async function generateCompletions({
+\nexport async function generateCompletions({
   logger,
   options,
   markdown,
