@@ -1,17 +1,6 @@
-import { encoding_for_model } from "@dqbd/tiktoken";
-import { TiktokenModel } from "@dqbd/tiktoken";
-import {
-  Document,
-  JsonFormatWithOptions,
-  TokenUsage,
-} from "../../../controllers/v2/types";
-import { Logger } from "winston";
-import { Meta } from "..";
-import { logger } from "../../../lib/logger";
-import { modelPrices } from "../../../lib/extract/usage/model-prices";
 import {
   AISDKError,
-  aiGenerateObject,
+  generateObject as aiGenerateObject,
   generateText,
   LanguageModel,
   NoObjectGeneratedError,
@@ -314,10 +303,7 @@ export type GenerateCompletionsOptions = {
   };
 };
 export 
-async function generateObject(config: any): Promise<any> {
-  try {
-    return await generateObject(config);
-  } catch (error: any) {
+ catch (error: any) {
     // Minimax / DeepSeek-style thinking tag handling
     if (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError") {
       const model = config.model;
@@ -456,13 +442,13 @@ async function generateCompletions({
           // @ts-ignore
           cost: calculateCost(
             modelId,
-            result.usage?.inputTokens ?? 0,
-            result.usage?.outputTokens ?? 0,
+            result?.usage?.inputTokens ?? 0,
+            result?.usage?.outputTokens ?? 0,
           ),
           // @ts-ignore
           tokens: {
-            input: result.usage?.inputTokens ?? 0,
-            output: result.usage?.outputTokens ?? 0,
+            input: result?.usage?.inputTokens ?? 0,
+            output: result?.usage?.outputTokens ?? 0,
           },
         });
 
@@ -471,13 +457,13 @@ async function generateCompletions({
         return {
           extract,
           warning,
-          numTokens: result.usage?.inputTokens ?? 0,
+          numTokens: result?.usage?.inputTokens ?? 0,
           totalUsage: {
-            promptTokens: result.usage?.inputTokens ?? 0,
-            completionTokens: result.usage?.outputTokens ?? 0,
+            promptTokens: result?.usage?.inputTokens ?? 0,
+            completionTokens: result?.usage?.outputTokens ?? 0,
             totalTokens:
-              result.usage?.inputTokens ??
-              0 + (result.usage?.outputTokens ?? 0),
+              result?.usage?.inputTokens ??
+              0 + (result?.usage?.outputTokens ?? 0),
           },
           model: modelId,
         };
@@ -567,26 +553,26 @@ async function generateCompletions({
               // @ts-ignore
           cost: calculateCost(
                 modelId,
-                result.usage?.inputTokens ?? 0,
-                result.usage?.outputTokens ?? 0,
+                result?.usage?.inputTokens ?? 0,
+                result?.usage?.outputTokens ?? 0,
               ),
               // @ts-ignore
           tokens: {
-                input: result.usage?.inputTokens ?? 0,
-                output: result.usage?.outputTokens ?? 0,
+                input: result?.usage?.inputTokens ?? 0,
+                output: result?.usage?.outputTokens ?? 0,
               },
             });
 
             return {
               extract,
               warning,
-              numTokens: result.usage?.inputTokens ?? 0,
+              numTokens: result?.usage?.inputTokens ?? 0,
               totalUsage: {
-                promptTokens: result.usage?.inputTokens ?? 0,
-                completionTokens: result.usage?.outputTokens ?? 0,
+                promptTokens: result?.usage?.inputTokens ?? 0,
+                completionTokens: result?.usage?.outputTokens ?? 0,
                 totalTokens:
-                  result.usage?.inputTokens ??
-                  0 + (result.usage?.outputTokens ?? 0),
+                  result?.usage?.inputTokens ??
+                  0 + (result?.usage?.outputTokens ?? 0),
               },
               model: modelId,
             };
@@ -865,15 +851,15 @@ async function generateCompletions({
         },
         // @ts-ignore
           tokens: {
-          input: result.usage?.inputTokens ?? 0,
-          output: result.usage?.outputTokens ?? 0,
+          input: result?.usage?.inputTokens ?? 0,
+          output: result?.usage?.outputTokens ?? 0,
         },
         model: modelId,
         // @ts-ignore
           cost: calculateCost(
           modelId,
-          result.usage?.inputTokens ?? 0,
-          result.usage?.outputTokens ?? 0,
+          result?.usage?.inputTokens ?? 0,
+          result?.usage?.outputTokens ?? 0,
         ),
       });
     } catch (error) {
@@ -906,15 +892,15 @@ async function generateCompletions({
             },
             // @ts-ignore
           tokens: {
-              input: result.usage?.inputTokens ?? 0,
-              output: result.usage?.outputTokens ?? 0,
+              input: result?.usage?.inputTokens ?? 0,
+              output: result?.usage?.outputTokens ?? 0,
             },
             model: modelId,
             // @ts-ignore
           cost: calculateCost(
               modelId,
-              result.usage?.inputTokens ?? 0,
-              result.usage?.outputTokens ?? 0,
+              result?.usage?.inputTokens ?? 0,
+              result?.usage?.outputTokens ?? 0,
             ),
           });
         } catch (retryError) {
@@ -975,8 +961,8 @@ async function generateCompletions({
     if (!result) {
       throw new Error("aiGenerateObject returned undefined result");
     }
-    const promptTokens = result.usage?.inputTokens ?? 0;
-    const completionTokens = result.usage?.outputTokens ?? 0;
+    const promptTokens = result?.usage?.inputTokens ?? 0;
+    const completionTokens = result?.usage?.outputTokens ?? 0;
 
     return {
       extract,
