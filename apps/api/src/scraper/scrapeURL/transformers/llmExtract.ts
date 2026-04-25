@@ -1,6 +1,17 @@
+import { encoding_for_model } from "@dqbd/tiktoken";
+import { TiktokenModel } from "@dqbd/tiktoken";
+import {
+  Document,
+  JsonFormatWithOptions,
+  TokenUsage,
+} from "../../../controllers/v2/types";
+import { Logger } from "winston";
+import { Meta } from "..";
+import { logger } from "../../../lib/logger";
+import { modelPrices } from "../../../lib/extract/usage/model-prices";
 import {
   AISDKError,
-  generateObject as aiGenerateObject,
+  generateObject as aiGenerateObject, generateText,
   generateText,
   LanguageModel,
   NoObjectGeneratedError,
@@ -283,6 +294,55 @@ export type GenerateCompletionsOptions = {
     llmsTxtId?: string;
   };
 };
+
+function sanitizeSchemaRecursive(schema: any): any {
+  if (!schema || typeof schema !== "object") return schema;
+  if (Array.isArray(schema)) return schema.map(sanitizeSchemaRecursive);
+  const newSchema: any = {};
+  for (const key in schema) {
+    if (key === "type" && Array.isArray(schema[key])) {
+      newSchema[key] = schema[key].includes("string") ? "string" : (schema[key][0] || "string");
+    } else {
+      newSchema[key] = sanitizeSchemaRecursive(schema[key]);
+    }
+  }
+  return newSchema;
+}
+
+async function generateObject(config: any): Promise<any> {
+  const modelId = (config.model as any)?.modelId || "";
+  const isMinimax = modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("gpt-3.5-turbo");
+
+  try {
+    return await aiGenerateObject(config);
+  } catch (error: any) {
+    if (isMinimax && (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError" || error.name === "NoObjectGeneratedError" || error.statusCode === 400)) {
+      console.log(`[DEBUG] Repairing Minimax output...`);
+      const { text } = await generateText({
+        model: config.model,
+        prompt: config.prompt,
+        system: config.system,
+      });
+
+      let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+      cleaned = cleaned.replace(/```json\n?([\s\S]*?)n?```/g, "$1").trim();
+      cleaned = cleaned.replace(/```[\s\S]*?\n?([\s\S]*?)n?```/g, "$1").trim();
+      if (cleaned.includes("{") && cleaned.indexOf("{") >= 0) cleaned = cleaned.substring(cleaned.indexOf("{"));
+      if (cleaned.includes("}") && cleaned.lastIndexOf("}") >= 0) cleaned = cleaned.substring(0, cleaned.lastIndexOf("}") + 1);
+
+      try {
+        return {
+          object: JSON.parse(cleaned),
+          usage: { totalTokens: 0 },
+        };
+      } catch (innerError) {
+        throw error;
+      }
+    }
+    throw error;
+  }
+}
+
 export async function generateCompletions({
   logger,
   options,
@@ -1543,68 +1603,6 @@ Return a JSON object with only the relevant options for the user's request. Don'
           functionId: "generateCrawlerOptionsFromPrompt",
         },
       });
-function sanitizeSchemaRecursive(schema: any): any {
-  if (!schema || typeof schema !== "object") return schema;
-  if (Array.isArray(schema)) return schema.map(sanitizeSchemaRecursive);
-  const newSchema: any = {};
-  for (const key in schema) {
-    if (key === "type" && Array.isArray(schema[key])) {
-      newSchema[key] = schema[key].includes("string") ? "string" : (schema[key][0] || "string");
-    } else {
-      newSchema[key] = sanitizeSchemaRecursive(schema[key]);
-    }
-  }
-  return newSchema;
-}
-
-async function generateObject(config: any): Promise<any> {
-  const modelId = (config.model as any)?.modelId || "";
-  const isMinimax = modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("gpt-3.5-turbo");
-
-  if (isMinimax) {
-    // Reinforce system prompt
-    const noThink = "\nIMPORTANT: OUTPUT ONLY RAW JSON. DO NOT include <think> tags. DO NOT include markdown blocks. START your response with '{'.";
-    if (config.system) {
-        config.system += noThink;
-    } else {
-        config.system = noThink;
-    }
-    // Disable strict mode for Minimax
-    if (config.providerOptions?.openai) {
-        config.providerOptions.openai.strictJsonSchema = false;
-    }
-  }
-
-  try {
-    return await aiGenerateObject(config);
-  } catch (error: any) {
-    if (isMinimax && (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError" || error.name === "NoObjectGeneratedError" || error.statusCode === 400)) {
-      console.log(`[DEBUG] Minimax error ${error.name}, attempting manual repair...`);
-      const { text } = await generateText({
-        model: config.model,
-        prompt: config.prompt,
-        system: config.system,
-      });
-
-      let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-      cleaned = cleaned.replace(/```json\n?([\s\S]*?)n?```/g, "$1").trim();
-      cleaned = cleaned.replace(/```[\s\S]*?\n?([\s\S]*?)n?```/g, "$1").trim();
-      if (cleaned.includes("{") && cleaned.indexOf("{") >= 0) cleaned = cleaned.substring(cleaned.indexOf("{"));
-      if (cleaned.includes("}") && cleaned.lastIndexOf("}") >= 0) cleaned = cleaned.substring(0, cleaned.lastIndexOf("}") + 1);
-
-      try {
-        return {
-          object: JSON.parse(cleaned),
-          usage: { totalTokens: 0 },
-        };
-      } catch (innerError) {
-        throw error;
-      }
-    }
-    throw error;
-  }
-}
-
 
       return { extract };
     } catch (error) {
