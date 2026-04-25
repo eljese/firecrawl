@@ -11,7 +11,7 @@ import { logger } from "../../../lib/logger";
 import { modelPrices } from "../../../lib/extract/usage/model-prices";
 import {
   AISDKError,
-  generateObject as aiGenerateObject,
+  generateObject as aiGenerateObject, generateText,
   generateText,
   LanguageModel,
   NoObjectGeneratedError,
@@ -38,21 +38,6 @@ function detectRecursiveSchema(schema: any): boolean {
   const hasDefs = !!(schema.$defs || schema.definitions);
 
   return hasRefs || hasDefs;
-}
-
-
-function sanitizeSchema(schema: any): any {
-  if (!schema || typeof schema !== "object") return schema;
-  if (Array.isArray(schema)) return schema.map(sanitizeSchema);
-  const newSchema: any = {};
-  for (const key in schema) {
-    if (key === "type" && Array.isArray(schema[key])) {
-      newSchema[key] = schema[key].includes("string") ? "string" : schema[key][0];
-    } else {
-      newSchema[key] = sanitizeSchema(schema[key]);
-    }
-  }
-  return newSchema;
 }
 
 function selectModelForSchema(schema?: any): {
@@ -309,42 +294,6 @@ export type GenerateCompletionsOptions = {
     llmsTxtId?: string;
   };
 };
-
-async function generateObject(config: any): Promise<any> {
-  try {
-    return await aiGenerateObject(config);
-  } catch (error: any) {
-    if (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError" || error.name === "NoObjectGeneratedError") {
-      const modelId = (config.model as any).modelId || "";
-      if (modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("gpt-3.5-turbo")) {
-        const { text } = await generateText({
-          model: config.model,
-          prompt: config.prompt,
-          system: config.system,
-        });
-        let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-        cleaned = cleaned.replace(/```json\n?([\s\S]*?)n?```/g, "$1").trim();
-        cleaned = cleaned.replace(/```[\s\S]*?\n?([\s\S]*?)n?```/g, "$1").trim();
-        if (cleaned.includes("{") && cleaned.indexOf("{") >= 0) {
-            cleaned = cleaned.substring(cleaned.indexOf("{"));
-        }
-        if (cleaned.includes("}") && cleaned.lastIndexOf("}") >= 0) {
-            cleaned = cleaned.substring(0, cleaned.lastIndexOf("}") + 1);
-        }
-        try {
-          return {
-            object: JSON.parse(cleaned),
-            usage: { totalTokens: 0 },
-          };
-        } catch (innerError) {
-          throw error;
-        }
-      }
-    }
-    throw error;
-  }
-}
-
 export async function generateCompletions({
   logger,
   options,
@@ -769,7 +718,7 @@ export async function generateCompletions({
       },
       system: options.systemPrompt,
       ...(schema && {
-        schema: schema instanceof z.ZodType ? schema : jsonSchema(sanitizeSchema(schema)),
+        schema: schema instanceof z.ZodType ? schema : jsonSchema(sanitizeSchemaRecursive(schema)),
       }),
       ...(!schema && { output: "no-schema" as const }),
       ...repairConfig,
@@ -1605,6 +1554,89 @@ Return a JSON object with only the relevant options for the user's request. Don'
           functionId: "generateCrawlerOptionsFromPrompt",
         },
       });
+function sanitizeSchemaRecursive(schema: any): any {
+  if (!schema || typeof schema !== "object") return schema;
+  if (Array.isArray(schema)) return schema.map(sanitizeSchemaRecursive);
+  const newSchema: any = {};
+  for (const key in schema) {
+    if (key === "type" && Array.isArray(schema[key])) {
+      newSchema[key] = schema[key].includes("string") ? "string" : (schema[key][0] || "string");
+    } else {
+      newSchema[key] = sanitizeSchemaRecursive(schema[key]);
+    }
+  }
+  return newSchema;
+}
+
+async function generateObject(config: any): Promise<any> {
+  const modelId = (config.model as any)?.modelId || "";
+  const isMinimax = modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("gpt-3.5-turbo");
+
+  if (isMinimax) {
+    console.log("[DEBUG] Minimax detected, applying aggressive pre-processing...");
+    if (config.schema && !(config.schema instanceof z.ZodType)) {
+        // config.schema might be an AI SDK jsonSchema wrapper, but let's try to reach the underlying schema if possible
+        // Actually, if it's already wrapped in jsonSchema(), we might not be able to mutate it easily.
+        // But in Firecrawl, it's often passed raw to generateObject.
+    }
+    
+    // Reinforce system prompt
+    const noThink = "\nIMPORTANT: OUTPUT ONLY RAW JSON. DO NOT include <think> tags. DO NOT include markdown blocks. START your response with '{'.";
+    if (config.system) {
+        config.system += noThink;
+    } else {
+        config.system = noThink;
+    }
+
+    // Disable strict mode for Minimax (OpenAI compatibility)
+    if (config.providerOptions?.openai) {
+        config.providerOptions.openai.strictJsonSchema = false;
+    }
+  }
+
+  try {
+    const result = await aiGenerateObject(config);
+    return result;
+  } catch (error: any) {
+    if (isMinimax && (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError" || error.name === "NoObjectGeneratedError" || error.statusCode === 400)) {
+      console.log(`[DEBUG] Minimax error ${error.name} (Status: ${error.statusCode}), attempting repair via generateText...`);
+      
+      // Fallback: Use generateText to get raw string and parse it manually
+      const { text } = await generateText({
+        model: config.model,
+        prompt: config.prompt,
+        system: config.system,
+      });
+
+      console.log("[DEBUG] Raw text from fallback:", text.substring(0, 100) + "...");
+
+      let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+      cleaned = cleaned.replace(/```json\n?([\s\S]*?)n?```/g, "$1").trim();
+      cleaned = cleaned.replace(/```[\s\S]*?\n?([\s\S]*?)n?```/g, "$1").trim();
+      
+      if (cleaned.includes("{") && cleaned.indexOf("{") >= 0) {
+          cleaned = cleaned.substring(cleaned.indexOf("{"));
+      }
+      if (cleaned.includes("}") && cleaned.lastIndexOf("}") >= 0) {
+          cleaned = cleaned.substring(0, cleaned.lastIndexOf("}") + 1);
+      }
+
+      try {
+        const parsed = JSON.parse(cleaned);
+        console.log("[DEBUG] Repair successful!");
+        return {
+          object: parsed,
+          usage: { totalTokens: 0 },
+        };
+      } catch (innerError) {
+        console.log("[DEBUG] Repair failed: " + innerError.message);
+        throw error;
+      }
+    }
+    throw error;
+  }
+}
+
 
       return { extract };
     } catch (error) {
