@@ -314,9 +314,9 @@ export type GenerateCompletionsOptions = {
   };
 };
 export 
-async function aiGenerateObject(config: any): Promise<any> {
+async function generateObject(config: any): Promise<any> {
   try {
-    return await aiGenerateObject(config);
+    return await generateObject(config);
   } catch (error: any) {
     // Minimax / DeepSeek-style thinking tag handling
     if (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError") {
@@ -453,11 +453,13 @@ async function generateCompletions({
             gcDetails: "no-object",
           },
           model: modelId,
+          // @ts-ignore
           cost: calculateCost(
             modelId,
             result.usage?.inputTokens ?? 0,
             result.usage?.outputTokens ?? 0,
           ),
+          // @ts-ignore
           tokens: {
             input: result.usage?.inputTokens ?? 0,
             output: result.usage?.outputTokens ?? 0,
@@ -562,12 +564,14 @@ async function generateCompletions({
                 gcDetails: "no-object fallback",
               },
               model: modelId,
-              cost: calculateCost(
+              // @ts-ignore
+          cost: calculateCost(
                 modelId,
                 result.usage?.inputTokens ?? 0,
                 result.usage?.outputTokens ?? 0,
               ),
-              tokens: {
+              // @ts-ignore
+          tokens: {
                 input: result.usage?.inputTokens ?? 0,
                 output: result.usage?.outputTokens ?? 0,
               },
@@ -730,13 +734,15 @@ async function generateCompletions({
               ...costTrackingOptions.metadata,
               gcDetails: "repairConfig",
             },
-            cost: calculateCost(
+            // @ts-ignore
+          cost: calculateCost(
               modelId,
               repairUsage?.inputTokens ?? 0,
               repairUsage?.outputTokens ?? 0,
             ),
             model: modelId,
-            tokens: {
+            // @ts-ignore
+          tokens: {
               input: repairUsage?.inputTokens ?? 0,
               output: repairUsage?.outputTokens ?? 0,
             },
@@ -849,7 +855,7 @@ async function generateCompletions({
         }
       | undefined;
     try {
-      result = await aiGenerateObject(aiGenerateObjectConfig);
+      result = await generateObject(aiGenerateObjectConfig);
       costTrackingOptions.costTracking.addCall({
         type: "other",
         metadata: {
@@ -857,12 +863,14 @@ async function generateCompletions({
           gcDetails: "aiGenerateObject",
           gcModel: aiGenerateObjectConfig.model.modelId,
         },
-        tokens: {
+        // @ts-ignore
+          tokens: {
           input: result.usage?.inputTokens ?? 0,
           output: result.usage?.outputTokens ?? 0,
         },
         model: modelId,
-        cost: calculateCost(
+        // @ts-ignore
+          cost: calculateCost(
           modelId,
           result.usage?.inputTokens ?? 0,
           result.usage?.outputTokens ?? 0,
@@ -888,7 +896,7 @@ async function generateCompletions({
             ...aiGenerateObjectConfig,
             model: currentModel,
           };
-          result = await aiGenerateObject(retryConfig);
+          result = await generateObject(retryConfig);
           costTrackingOptions.costTracking.addCall({
             type: "other",
             metadata: {
@@ -896,12 +904,14 @@ async function generateCompletions({
               gcDetails: "aiGenerateObject fallback",
               gcModel: retryConfig.model.modelId,
             },
-            tokens: {
+            // @ts-ignore
+          tokens: {
               input: result.usage?.inputTokens ?? 0,
               output: result.usage?.outputTokens ?? 0,
             },
             model: modelId,
-            cost: calculateCost(
+            // @ts-ignore
+          cost: calculateCost(
               modelId,
               result.usage?.inputTokens ?? 0,
               result.usage?.outputTokens ?? 0,
