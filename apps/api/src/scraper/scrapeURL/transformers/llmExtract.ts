@@ -304,7 +304,7 @@ export type GenerateCompletionsOptions = {
 };
 async function generateObject(config: any): Promise<any> {
   try {
-    return await aiGenerateObject(config);
+    return await generateObject(config);
   } catch (error: any) {
     // Minimax / DeepSeek-style thinking tag handling
     if (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError") {
