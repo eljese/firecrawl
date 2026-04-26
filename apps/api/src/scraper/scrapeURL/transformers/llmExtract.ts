@@ -325,8 +325,8 @@ async function generateObject(config: any): Promise<any> {
       });
 
       let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-      cleaned = cleaned.replace(/```json\n?([\s\S]*?)n?```/g, "$1").trim();
-      cleaned = cleaned.replace(/```[\s\S]*?\n?([\s\S]*?)n?```/g, "$1").trim();
+      cleaned = cleaned.replace(/```json\n?([\s\S]*?)\n?```/g, "$1").trim();
+      cleaned = cleaned.replace(/```[\s\S]*?\n?([\s\S]*?)\n?```/g, "$1").trim();
       if (cleaned.includes("{") && cleaned.indexOf("{") >= 0) cleaned = cleaned.substring(cleaned.indexOf("{"));
       if (cleaned.includes("}") && cleaned.lastIndexOf("}") >= 0) cleaned = cleaned.substring(0, cleaned.lastIndexOf("}") + 1);
 
@@ -342,7 +342,9 @@ async function generateObject(config: any): Promise<any> {
     throw error;
   }
 }
-\nexport async function generateCompletions({
+
+
+export async function generateCompletions({
   logger,
   options,
   markdown,
