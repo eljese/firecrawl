@@ -11,7 +11,7 @@ import { logger } from "../../../lib/logger";
 import { modelPrices } from "../../../lib/extract/usage/model-prices";
 import {
   AISDKError,
-  generateObject as aiGenerateObject,
+  generateObject,
   generateText,
   LanguageModel,
   NoObjectGeneratedError,
@@ -27,6 +27,20 @@ import { isAgentExtractModelValid } from "../../../controllers/v1/types";
 import { hasFormatOfType } from "../../../lib/format-utils";
 
 // Smart model selection based on schema
+
+function sanitizeLLMOutput(text: string): string {
+  if (!text) return text;
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  cleaned = cleaned.replace(/```json\n?([\s\S]*?)\n?```/g, "$1").trim();
+  cleaned = cleaned.replace(/```[\s\S]*?\n?([\s\S]*?)\n?```/g, "$1").trim();
+  if (cleaned.includes("{") && cleaned.indexOf("{") >= 0) {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (end > start) cleaned = cleaned.substring(start, end + 1);
+  }
+  return cleaned;
+}
+
 function detectRecursiveSchema(schema: any): boolean {
   if (!schema || typeof schema !== "object") return false;
 
@@ -309,40 +323,6 @@ function sanitizeSchemaRecursive(schema: any): any {
   return newSchema;
 }
 
-async function generateObject(config: any): Promise<any> {
-  const modelId = (config.model as any)?.modelId || "";
-  const isMinimax = modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("gpt-3.5-turbo");
-
-  try {
-    return await aiGenerateObject(config);
-  } catch (error: any) {
-    if (isMinimax && (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError" || error.name === "NoObjectGeneratedError" || error.statusCode === 400)) {
-      console.log(`[DEBUG] Repairing Minimax output...`);
-      const { text } = await generateText({
-        model: config.model,
-        prompt: config.prompt,
-        system: config.system,
-      });
-
-      let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-      cleaned = cleaned.replace(/```json\n?([\s\S]*?)\n?```/g, "$1").trim();
-      cleaned = cleaned.replace(/```[\s\S]*?\n?([\s\S]*?)\n?```/g, "$1").trim();
-      if (cleaned.includes("{") && cleaned.indexOf("{") >= 0) cleaned = cleaned.substring(cleaned.indexOf("{"));
-      if (cleaned.includes("}") && cleaned.lastIndexOf("}") >= 0) cleaned = cleaned.substring(0, cleaned.lastIndexOf("}") + 1);
-
-      try {
-        return {
-          object: JSON.parse(cleaned),
-          usage: { totalTokens: 0 },
-        };
-      } catch (innerError) {
-        throw error;
-      }
-    }
-    throw error;
-  }
-}
-
 
 export async function generateCompletions({
   logger,
@@ -449,12 +429,12 @@ export async function generateCompletions({
           model: modelId,
           cost: calculateCost(
             modelId,
-            result?.usage?.inputTokens ?? 0,
-            result?.usage?.outputTokens ?? 0,
+            result.usage?.inputTokens ?? 0,
+            result.usage?.outputTokens ?? 0,
           ),
           tokens: {
-            input: result?.usage?.inputTokens ?? 0,
-            output: result?.usage?.outputTokens ?? 0,
+            input: result.usage?.inputTokens ?? 0,
+            output: result.usage?.outputTokens ?? 0,
           },
         });
 
@@ -463,13 +443,13 @@ export async function generateCompletions({
         return {
           extract,
           warning,
-          numTokens: result?.usage?.inputTokens ?? 0,
+          numTokens: result.usage?.inputTokens ?? 0,
           totalUsage: {
-            promptTokens: result?.usage?.inputTokens ?? 0,
-            completionTokens: result?.usage?.outputTokens ?? 0,
+            promptTokens: result.usage?.inputTokens ?? 0,
+            completionTokens: result.usage?.outputTokens ?? 0,
             totalTokens:
-              result?.usage?.inputTokens ??
-              0 + (result?.usage?.outputTokens ?? 0),
+              result.usage?.inputTokens ??
+              0 + (result.usage?.outputTokens ?? 0),
           },
           model: modelId,
         };
@@ -558,25 +538,25 @@ export async function generateCompletions({
               model: modelId,
               cost: calculateCost(
                 modelId,
-                result?.usage?.inputTokens ?? 0,
-                result?.usage?.outputTokens ?? 0,
+                result.usage?.inputTokens ?? 0,
+                result.usage?.outputTokens ?? 0,
               ),
               tokens: {
-                input: result?.usage?.inputTokens ?? 0,
-                output: result?.usage?.outputTokens ?? 0,
+                input: result.usage?.inputTokens ?? 0,
+                output: result.usage?.outputTokens ?? 0,
               },
             });
 
             return {
               extract,
               warning,
-              numTokens: result?.usage?.inputTokens ?? 0,
+              numTokens: result.usage?.inputTokens ?? 0,
               totalUsage: {
-                promptTokens: result?.usage?.inputTokens ?? 0,
-                completionTokens: result?.usage?.outputTokens ?? 0,
+                promptTokens: result.usage?.inputTokens ?? 0,
+                completionTokens: result.usage?.outputTokens ?? 0,
                 totalTokens:
-                  result?.usage?.inputTokens ??
-                  0 + (result?.usage?.outputTokens ?? 0),
+                  result.usage?.inputTokens ??
+                  0 + (result.usage?.outputTokens ?? 0),
               },
               model: modelId,
             };
@@ -628,6 +608,7 @@ export async function generateCompletions({
 
     const repairConfig = {
       experimental_repairText: async ({ text, error }) => {
+        text = sanitizeLLMOutput(text);
         // AI may output a markdown JSON code block. Remove it - mogery
         logger.debug("Repairing text", {
           textType: typeof text,
@@ -736,7 +717,7 @@ export async function generateCompletions({
             },
           });
           logger.debug("Repaired text with LLM");
-          return fixedText;
+          return sanitizeLLMOutput(fixedText);
         } catch (repairError) {
           lastError = repairError as Error;
           logger.error("Failed to repair JSON", { error: lastError.message });
@@ -852,14 +833,14 @@ export async function generateCompletions({
           gcModel: generateObjectConfig.model.modelId,
         },
         tokens: {
-          input: result?.usage?.inputTokens ?? 0,
-          output: result?.usage?.outputTokens ?? 0,
+          input: result.usage?.inputTokens ?? 0,
+          output: result.usage?.outputTokens ?? 0,
         },
         model: modelId,
         cost: calculateCost(
           modelId,
-          result?.usage?.inputTokens ?? 0,
-          result?.usage?.outputTokens ?? 0,
+          result.usage?.inputTokens ?? 0,
+          result.usage?.outputTokens ?? 0,
         ),
       });
     } catch (error) {
@@ -891,14 +872,14 @@ export async function generateCompletions({
               gcModel: retryConfig.model.modelId,
             },
             tokens: {
-              input: result?.usage?.inputTokens ?? 0,
-              output: result?.usage?.outputTokens ?? 0,
+              input: result.usage?.inputTokens ?? 0,
+              output: result.usage?.outputTokens ?? 0,
             },
             model: modelId,
             cost: calculateCost(
               modelId,
-              result?.usage?.inputTokens ?? 0,
-              result?.usage?.outputTokens ?? 0,
+              result.usage?.inputTokens ?? 0,
+              result.usage?.outputTokens ?? 0,
             ),
           });
         } catch (retryError) {
@@ -959,8 +940,8 @@ export async function generateCompletions({
     if (!result) {
       throw new Error("generateObject returned undefined result");
     }
-    const promptTokens = result?.usage?.inputTokens ?? 0;
-    const completionTokens = result?.usage?.outputTokens ?? 0;
+    const promptTokens = result.usage?.inputTokens ?? 0;
+    const completionTokens = result.usage?.outputTokens ?? 0;
 
     return {
       extract,
