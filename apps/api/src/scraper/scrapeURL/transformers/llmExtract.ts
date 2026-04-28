@@ -297,7 +297,7 @@ export type GenerateCompletionsOptions = {
 
 function sanitizeLLMOutput(text: string): string {
   if (!text) return text;
-  // console.log("[DEBUG] Sanitizing text: " + text.substring(0, 100) + "...");
+  // console.log("[V27 DEBUG] Sanitizing text: " + text.substring(0, 100) + "...");
   // 1. Strip think tags aggressively
   let cleaned = text.replace(/<think>[\s\S]*?(<\/think>|$)/gi, "").trim();
   // 2. Extract JSON block if present
@@ -325,11 +325,14 @@ function sanitizeSchemaRecursive(schema: any): any {
   return newSchema;
 }
 
-async function generateObject(config: any): Promise<any> {
-  // Use a Proxy-like wrapper to inject our sanitizer into the experimental_repairText if it exists
+async function patchedGenerateObject(config: any): Promise<any> {
+  console.log("[V27 DEBUG] patchedGenerateObject called for model: " + (config.model?.modelId || "unknown"));
+  
+  // Inject sanitizer into repair flow
   if (config.experimental_repairText) {
     const originalRepair = config.experimental_repairText;
     config.experimental_repairText = async (params: any) => {
+       console.log("[V27 DEBUG] experimental_repairText called");
        params.text = sanitizeLLMOutput(params.text);
        const repaired = await originalRepair(params);
        return sanitizeLLMOutput(repaired);
@@ -340,23 +343,29 @@ async function generateObject(config: any): Promise<any> {
     const result = await aiGenerateObject(config);
     return result;
   } catch (error: any) {
-    // If it still fails, or if it's a parse error we can handle
+    console.log("[V27 DEBUG] aiGenerateObject failed: " + error.name + " - " + error.message);
     const modelId = (config.model as any)?.modelId || "";
     const isMinimax = modelId.toLowerCase().includes("minimax");
 
     if (isMinimax && (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError")) {
+       console.log("[V27 DEBUG] Triggering Minimax fallback via generateText");
        // Manual fallback to generateText + sanitize
        const { text } = await generateText({
          model: config.model,
          prompt: config.prompt,
          system: config.system,
        });
+       console.log("[V27 DEBUG] Fallback text received (first 50 chars): " + text.substring(0, 50));
        try {
+         const cleaned = sanitizeLLMOutput(text);
+         const obj = JSON.parse(cleaned);
+         console.log("[V27 DEBUG] Successfully parsed fallback JSON");
          return {
-           object: JSON.parse(sanitizeLLMOutput(text)),
+           object: obj,
            usage: { totalTokens: 0 },
          };
-       } catch (inner) {
+       } catch (inner: any) {
+         console.log("[V27 DEBUG] Fallback JSON parse failed: " + inner.message);
          throw error;
        }
     }
@@ -835,7 +844,7 @@ export async function generateCompletions({
             temperature: 1,
           }
         : {}),
-    } satisfies Parameters<typeof generateObject>[0];
+    } satisfies Parameters<typeof aiGenerateObject>[0];
 
     // const now = new Date().getTime();
     // await fs.writeFile(
@@ -864,7 +873,7 @@ export async function generateCompletions({
         }
       | undefined;
     try {
-      result = await generateObject(generateObjectConfig);
+      result = await patchedGenerateObject(generateObjectConfig);
       costTrackingOptions.costTracking.addCall({
         type: "other",
         metadata: {
@@ -903,7 +912,7 @@ export async function generateCompletions({
             ...generateObjectConfig,
             model: currentModel,
           };
-          result = await generateObject(retryConfig);
+          result = await patchedGenerateObject(retryConfig);
           costTrackingOptions.costTracking.addCall({
             type: "other",
             metadata: {
