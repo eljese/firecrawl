@@ -11,6 +11,9 @@ import { logger } from "../../../lib/logger";
 import { modelPrices } from "../../../lib/extract/usage/model-prices";
 import {
   AISDKError,
+  wrapLanguageModel,
+  extractReasoningMiddleware,
+  experimental_extractJsonMiddleware as extractJsonMiddleware,
   generateObject as aiGenerateObject,
   generateText,
   LanguageModel,
@@ -295,21 +298,6 @@ export type GenerateCompletionsOptions = {
   };
 };
 
-function sanitizeLLMOutput(text: string): string {
-  if (!text) return text;
-  // 1. Strip think tags aggressively
-  let cleaned = text.replace(/<think>[\s\S]*?(<\/think>|$)/gi, "").trim();
-  // 2. Extract JSON block if present
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start !== -1 && end !== -1 && end > start) {
-    cleaned = cleaned.substring(start, end + 1);
-  }
-  // 3. Strip code fences if they survived
-  cleaned = cleaned.replace(/```json/gi, "").replace(/```/g, "").trim();
-  return cleaned;
-}
-
 function sanitizeSchemaRecursive(schema: any): any {
   if (!schema || typeof schema !== "object") return schema;
   if (Array.isArray(schema)) return schema.map(sanitizeSchemaRecursive);
@@ -326,51 +314,54 @@ function sanitizeSchemaRecursive(schema: any): any {
 
 async function patchedGenerateObject(config: any): Promise<any> {
   const modelId = (config.model as any)?.modelId || "";
-  const isMinimax = modelId.toLowerCase().includes("minimax");
+  const isReasoningModel = modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("deepseek");
   
-  if (isMinimax) {
-    console.log("[V28 DEBUG] Minimax detected. Bypassing aiGenerateObject for manual extraction.");
-    const { text } = await generateText({
+  if (isReasoningModel) {
+    console.log("[V29 DEBUG] Reasoning model detected (" + modelId + "). Applying native AI SDK middlewares.");
+    
+    // Wrap model with reasoning and JSON extraction middlewares
+    config.model = wrapLanguageModel({
       model: config.model,
-      prompt: config.prompt,
-      system: config.system,
+      middleware: [
+        extractReasoningMiddleware({ tagName: 'think', startWithReasoning: true }),
+        extractJsonMiddleware(),
+      ],
     });
-    
-    const cleaned = sanitizeLLMOutput(text);
-    console.log("[V28 DEBUG] Cleaned text (first 100): " + cleaned.substring(0, 100));
-    
-    try {
-      const obj = JSON.parse(cleaned);
-      console.log("[V28 DEBUG] Successfully parsed JSON manually.");
-      return {
-        object: obj,
-        usage: { totalTokens: 0 },
-      };
-    } catch (e: any) {
-      console.log("[V28 DEBUG] Manual parse failed: " + e.message + ". Retrying with aiGenerateObject as last resort.");
-      // Fall through to aiGenerateObject
+
+    // Attempt to inject reasoning_split if ExtraBody is available
+    if (modelId.toLowerCase().includes("minimax")) {
+        if (!config.providerOptions) config.providerOptions = {};
+        // Note: AI SDK openai provider usually maps this via providerOptions or extraBody
+        // Depending on version, it might be:
+        // config.providerOptions.openai = { extraBody: { reasoning_split: true } };
     }
   }
 
-  // Standard flow for other models or if manual failed
   try {
     const result = await aiGenerateObject(config);
-    if (isMinimax && (!result || !result.object)) {
-       throw new Error("Empty object from aiGenerateObject for Minimax");
-    }
     return result;
   } catch (error: any) {
-    console.log("[V28 DEBUG] aiGenerateObject failed: " + error.name);
-    if (isMinimax) {
-       // One final attempt if we haven't already
-       console.log("[V28 DEBUG] Final fallback attempt...");
+    console.log("[V29 DEBUG] aiGenerateObject failed: " + error.name + " - " + error.message);
+    
+    // Fallback: If native middleware failed (unlikely), try one direct text attempt
+    if (isReasoningModel) {
+       console.log("[V29 DEBUG] Manual fallback attempt...");
        const { text } = await generateText({
-         model: config.model,
+         model: config.model, // Still use wrapped model
          prompt: config.prompt,
          system: config.system,
        });
+       
+       // Slicing as last resort if middleware somehow missed it
+       let cleaned = text.replace(/<think>[\s\S]*?(<\/think>|$)/gi, "").trim();
+       const start = cleaned.indexOf("{");
+       const end = cleaned.lastIndexOf("}");
+       if (start !== -1 && end !== -1 && end > start) {
+         cleaned = cleaned.substring(start, end + 1);
+       }
+
        return {
-         object: JSON.parse(sanitizeLLMOutput(text)),
+         object: JSON.parse(cleaned),
          usage: { totalTokens: 0 },
        };
     }
