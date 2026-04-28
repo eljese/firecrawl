@@ -297,7 +297,6 @@ export type GenerateCompletionsOptions = {
 
 function sanitizeLLMOutput(text: string): string {
   if (!text) return text;
-  // console.log("[V27 DEBUG] Sanitizing text: " + text.substring(0, 100) + "...");
   // 1. Strip think tags aggressively
   let cleaned = text.replace(/<think>[\s\S]*?(<\/think>|$)/gi, "").trim();
   // 2. Extract JSON block if present
@@ -326,48 +325,54 @@ function sanitizeSchemaRecursive(schema: any): any {
 }
 
 async function patchedGenerateObject(config: any): Promise<any> {
-  console.log("[V27 DEBUG] patchedGenerateObject called for model: " + (config.model?.modelId || "unknown"));
+  const modelId = (config.model as any)?.modelId || "";
+  const isMinimax = modelId.toLowerCase().includes("minimax");
   
-  // Inject sanitizer into repair flow
-  if (config.experimental_repairText) {
-    const originalRepair = config.experimental_repairText;
-    config.experimental_repairText = async (params: any) => {
-       console.log("[V27 DEBUG] experimental_repairText called");
-       params.text = sanitizeLLMOutput(params.text);
-       const repaired = await originalRepair(params);
-       return sanitizeLLMOutput(repaired);
-    };
+  if (isMinimax) {
+    console.log("[V28 DEBUG] Minimax detected. Bypassing aiGenerateObject for manual extraction.");
+    const { text } = await generateText({
+      model: config.model,
+      prompt: config.prompt,
+      system: config.system,
+    });
+    
+    const cleaned = sanitizeLLMOutput(text);
+    console.log("[V28 DEBUG] Cleaned text (first 100): " + cleaned.substring(0, 100));
+    
+    try {
+      const obj = JSON.parse(cleaned);
+      console.log("[V28 DEBUG] Successfully parsed JSON manually.");
+      return {
+        object: obj,
+        usage: { totalTokens: 0 },
+      };
+    } catch (e: any) {
+      console.log("[V28 DEBUG] Manual parse failed: " + e.message + ". Retrying with aiGenerateObject as last resort.");
+      // Fall through to aiGenerateObject
+    }
   }
 
+  // Standard flow for other models or if manual failed
   try {
     const result = await aiGenerateObject(config);
+    if (isMinimax && (!result || !result.object)) {
+       throw new Error("Empty object from aiGenerateObject for Minimax");
+    }
     return result;
   } catch (error: any) {
-    console.log("[V27 DEBUG] aiGenerateObject failed: " + error.name + " - " + error.message);
-    const modelId = (config.model as any)?.modelId || "";
-    const isMinimax = modelId.toLowerCase().includes("minimax");
-
-    if (isMinimax && (error.name === "AI_NoObjectGeneratedError" || error.name === "AI_JSONParseError")) {
-       console.log("[V27 DEBUG] Triggering Minimax fallback via generateText");
-       // Manual fallback to generateText + sanitize
+    console.log("[V28 DEBUG] aiGenerateObject failed: " + error.name);
+    if (isMinimax) {
+       // One final attempt if we haven't already
+       console.log("[V28 DEBUG] Final fallback attempt...");
        const { text } = await generateText({
          model: config.model,
          prompt: config.prompt,
          system: config.system,
        });
-       console.log("[V27 DEBUG] Fallback text received (first 50 chars): " + text.substring(0, 50));
-       try {
-         const cleaned = sanitizeLLMOutput(text);
-         const obj = JSON.parse(cleaned);
-         console.log("[V27 DEBUG] Successfully parsed fallback JSON");
-         return {
-           object: obj,
-           usage: { totalTokens: 0 },
-         };
-       } catch (inner: any) {
-         console.log("[V27 DEBUG] Fallback JSON parse failed: " + inner.message);
-         throw error;
-       }
+       return {
+         object: JSON.parse(sanitizeLLMOutput(text)),
+         usage: { totalTokens: 0 },
+       };
     }
     throw error;
   }
