@@ -13,7 +13,7 @@ import {
   AISDKError,
   wrapLanguageModel,
   extractReasoningMiddleware,
-  experimental_extractJsonMiddleware as extractJsonMiddleware,
+  extractJsonMiddleware,
   generateObject as aiGenerateObject,
   generateText,
   LanguageModel,
@@ -317,7 +317,7 @@ async function patchedGenerateObject(config: any): Promise<any> {
   const isReasoningModel = modelId.toLowerCase().includes("minimax") || modelId.toLowerCase().includes("deepseek");
   
   if (isReasoningModel) {
-    console.log("[V29 DEBUG] Reasoning model detected (" + modelId + "). Applying native AI SDK middlewares.");
+    console.log("[V30 DEBUG] Reasoning model detected (" + modelId + "). Applying native AI SDK middlewares.");
     
     // Wrap model with reasoning and JSON extraction middlewares
     config.model = wrapLanguageModel({
@@ -327,32 +327,22 @@ async function patchedGenerateObject(config: any): Promise<any> {
         extractJsonMiddleware(),
       ],
     });
-
-    // Attempt to inject reasoning_split if ExtraBody is available
-    if (modelId.toLowerCase().includes("minimax")) {
-        if (!config.providerOptions) config.providerOptions = {};
-        // Note: AI SDK openai provider usually maps this via providerOptions or extraBody
-        // Depending on version, it might be:
-        // config.providerOptions.openai = { extraBody: { reasoning_split: true } };
-    }
   }
 
   try {
     const result = await aiGenerateObject(config);
     return result;
   } catch (error: any) {
-    console.log("[V29 DEBUG] aiGenerateObject failed: " + error.name + " - " + error.message);
+    console.log("[V30 DEBUG] aiGenerateObject failed: " + error.name + " - " + error.message);
     
-    // Fallback: If native middleware failed (unlikely), try one direct text attempt
     if (isReasoningModel) {
-       console.log("[V29 DEBUG] Manual fallback attempt...");
+       console.log("[V30 DEBUG] Manual fallback attempt...");
        const { text } = await generateText({
-         model: config.model, // Still use wrapped model
+         model: config.model,
          prompt: config.prompt,
          system: config.system,
        });
        
-       // Slicing as last resort if middleware somehow missed it
        let cleaned = text.replace(/<think>[\s\S]*?(<\/think>|$)/gi, "").trim();
        const start = cleaned.indexOf("{");
        const end = cleaned.lastIndexOf("}");
