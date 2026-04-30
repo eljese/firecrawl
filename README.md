@@ -39,6 +39,8 @@
 
 # **🔥 Firecrawl**
 
+> **🚨 Homelab Fork Notice:** This repository is a custom fork configured to use alternative LLMs (via LiteLLM proxy or local/custom providers) for data extraction, avoiding hardcoded dependencies on specific commercial APIs.
+
 **Power AI agents with clean web data.** The API to search, scrape, and interact with the web at scale. Open source and available as a [hosted service](https://firecrawl.dev/?ref=github).
 
 _Pst. Hey, you, join our stargazers :)_
